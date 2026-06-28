@@ -4,24 +4,46 @@ import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
   const canvasRef = useRef(null);
   
+  // ESTADO FÍSICO INTEGRADO DEL JUEGO
   const gameState = useRef({
-    // vx reducida a 1.6 para que el personaje vaya más lento y sea fácil jugar
-    personaje: { x: 200, y: 450, vx: 1.6, vy: 0, size: 20, enSuelo: false },
-    agua: { y: 580, speed: 0.4, baseSpeed: 0.4 },
+    personaje: { x: 200, y: 400, vx: 1.6, vy: 0, size: 20, enSuelo: false },
     plataformas: [],
     camaraY: 0,
     alturaMaxima: 0, 
     gravedad: 0.32,
-    fuerzaSalto: -8.2 
+    fuerzaSalto: -8.2,
+    
+    // CONTROL DEL DOBLE SALTO
+    dobleSaltoDisponible: true,
+
+    // SISTEMA DE VIDAS Y CAÍDAS CRÍTICAS
+    vidas: 2,
+    puntoMasAltoAlcanzadoY: 400, 
+    caidaCriticaDistancia: 185,
+    inmune: false 
   });
 
+  // DISPARADOR DE SALTO COMPATIBLE CON DOBLE SALTO
   useImperativeHandle(ref, () => ({
     triggerJump() {
       const state = gameState.current;
       const p = state.personaje;
-      if (p.enSuelo && !isPaused) {
+      
+      if (isPaused) return;
+
+      // Primer salto desde una plataforma
+      if (p.enSuelo) {
         p.vy = state.fuerzaSalto;
         p.enSuelo = false;
+        state.dobleSaltoDisponible = true; 
+        state.puntoMasAltoAlcanzadoY = p.y;
+        state.inmune = false;
+      } 
+      // Segundo salto en el aire (Doble Salto)
+      else if (state.dobleSaltoDisponible) {
+        p.vy = state.fuerzaSalto * 0.82; 
+        state.dobleSaltoDisponible = false; 
+        state.puntoMasAltoAlcanzadoY = p.y; // Resetea para evitar daño injusto
       }
     }
   }));
@@ -40,7 +62,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       lista.push({ x: 0, y: 520, width: canvas.width, height: 15 });
       
       let ultimaY = 520;
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 150; i++) { 
         ultimaY -= Math.floor(Math.random() * 15) + 45; 
         const width = Math.floor(Math.random() * 30) + 75; 
         const x = Math.floor(Math.random() * (canvas.width - width));
@@ -54,7 +76,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     const gameLoop = () => {
       const state = gameState.current;
       const p = state.personaje;
-      const agua = state.agua;
 
       if (isPaused) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -68,7 +89,9 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         return;
       }
 
-      // 1. ACTUALIZAR FÍSICAS (Personaje más lento)
+      // ==========================================
+      // A. FISICAS GENERALES
+      // ==========================================
       p.x += p.vx;
       if (p.x <= 0 || p.x + p.size >= canvas.width) {
         p.vx *= -1; 
@@ -77,16 +100,15 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       p.vy += state.gravedad;
       p.y += p.vy;
 
-      // SOLUCIÓN AL BUG NaN: Aseguramos que alturaMaxima siempre sea un número antes de calcular
-      const alturaSegura = Number(state.alturaMaxima) || 0;
-      const incrementoDificultad = Math.min(alturaSegura / 3000, 1.2);
-      agua.speed = Number(state.agua.baseSpeed) + incrementoDificultad;
-      
-      // El agua sube de forma constante
-      agua.y -= agua.speed;
+      if (p.vy < 0 && p.y < state.puntoMasAltoAlcanzadoY) {
+        state.puntoMasAltoAlcanzadoY = p.y;
+      }
 
-      // 2. DETECCIÓN DE COLISIONES
+      // ==========================================
+      // B. COLISIONES Y DAÑO POR CAÍDA
+      // ==========================================
       p.enSuelo = false;
+
       if (p.vy >= 0) {
         for (let plat of state.plataformas) {
           if (
@@ -95,76 +117,113 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
             p.y + p.size >= plat.y &&
             p.y + p.size <= plat.y + 12
           ) {
+            const distanciaCaida = p.y - state.puntoMasAltoAlcanzadoY;
+            if (distanciaCaida >= state.caidaCriticaDistancia && !state.inmune) {
+              state.vidas -= 1;
+              state.inmune = true; 
+            }
+
             p.y = plat.y - p.size;
             p.vy = 0;
             p.enSuelo = true;
+            state.dobleSaltoDisponible = true; 
+            state.puntoMasAltoAlcanzadoY = p.y; 
             break;
           }
         }
       }
 
-      // 3. MOVIMIENTO DE CÁMARA (CORREGIDO)
-      const mitadPantalla = canvas.height / 2;
-      if (p.y < mitadPantalla) {
-        const desfase = mitadPantalla - p.y;
-        p.y = mitadPantalla;
+      // ==========================================
+      // C. CAMARA FLUIDA BIDIRECCIONAL (EFECTO CAÍDA)
+      // ==========================================
+const limiteSuperior = canvas.height * 0.4; 
+      const limiteInferior = canvas.height * 0.7; 
+
+      if (p.y < limiteSuperior) {
+        const desfase = limiteSuperior - p.y;
+        p.y = limiteSuperior;
         
+        // La cámara física se mueve hacia abajo para mostrar lo de arriba
         state.camaraY += desfase;
-        state.alturaMaxima += desfase;
         
-        // El agua baja un poco menos de lo que tú subes para que te persiga
-        agua.y += desfase * 0.75; 
+        // CORRECCIÓN: Registramos la altura acumulada total de la cámara física
+        const alturaActualCalculada = state.camaraY;
+        
+        // Solo aumentamos la altura máxima si superamos el punto más alto de esta partida
+        if (alturaActualCalculada > state.alturaMaxima) {
+          state.alturaMaxima = alturaActualCalculada;
+        }
+
+        state.puntoMasAltoAlcanzadoY += desfase;
 
         for (let plat of state.plataformas) {
           plat.y += desfase;
         }
-      }
+      } 
+      else if (p.y > limiteInferior) {
+        const desfase = p.y - limiteInferior;
+        p.y = limiteInferior;
+        
+        // Al caer, la cámara física retrocede hacia arriba
+        state.camaraY -= desfase; 
+        state.puntoMasAltoAlcanzadoY -= desfase;
 
-      if (state.plataformas[state.plataformas.length - 1].y > 0) {
-        let ultimaY = state.plataformas[state.plataformas.length - 1].y;
-        for (let i = 0; i < 15; i++) {
-          ultimaY -= Math.floor(Math.random() * 15) + 45;
-          const width = Math.floor(Math.random() * 30) + 75;
-          const x = Math.floor(Math.random() * (canvas.width - width));
-          state.plataformas.push({ x, y: ultimaY, width, height: 12 });
+        // YA NO RESTAMOS de state.alturaMaxima aquí, así se queda fija en tu récord
+
+        for (let plat of state.plataformas) {
+          plat.y -= desfase;
         }
       }
 
-      // 4. GAME OVER
-      if (p.y + p.size >= agua.y || p.y > canvas.height) {
+      // ==========================================
+      // D. CONDICIÓN DE GAME OVER
+      // ==========================================
+     if (state.vidas <= 0) {
         cancelAnimationFrame(loopId);
         onGameOver(Math.floor(state.alturaMaxima / 10)); 
         return;
       }
 
-      // 5. RENDERIZADO VISUAL
+      // CONTROL DE VACÍO REAL: Si el suelo base inicial (plataformas[0]) 
+      // sube más allá de la mitad de la pantalla y el personaje está abajo, es muerte instantánea.
+      if (state.plataformas[0] && state.plataformas[0].y < p.y) {
+        cancelAnimationFrame(loopId);
+        onGameOver(Math.floor(state.alturaMaxima / 10)); 
+        return;
+      }
+
+      // ==========================================
+      // E. RE-RENDERIZADO GRÁFICO
+      // ==========================================
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       let fondoY = (state.camaraY) % canvas.height;
+      if (fondoY < 0) fondoY += canvas.height; 
       ctx.drawImage(imagenFondo, 0, fondoY, canvas.width, canvas.height);
       ctx.drawImage(imagenFondo, 0, fondoY - canvas.height, canvas.width, canvas.height);
 
       for (let plat of state.plataformas) {
-        ctx.fillStyle = '#4a5568';
-        ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-        ctx.fillStyle = '#48bb78';
-        ctx.fillRect(plat.x, plat.y, plat.width, 3);
+        if (plat.y >= -20 && plat.y <= canvas.height + 20) {
+          ctx.fillStyle = '#4a5568';
+          ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+          ctx.fillStyle = '#48bb78';
+          ctx.fillRect(plat.x, plat.y, plat.width, 3);
+        }
       }
 
-      ctx.fillStyle = '#ecc94b'; 
+      // El personaje parpadea en rojo si es inmune temporal por caída
+      ctx.fillStyle = state.inmune && Math.floor(Date.now() / 100) % 2 === 0 ? '#e53e3e' : '#ecc94b'; 
       ctx.fillRect(p.x, p.y, p.size, p.size);
 
-      // Dibujar Agua Azul Translúcida
-      ctx.fillStyle = 'rgba(49, 130, 206, 0.65)';
-      ctx.fillRect(0, agua.y, canvas.width, canvas.height - agua.y);
-
-      // MARCADORES TEXTUALES
+      // MARCADORES DE RENDIMIENTO
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 16px "Courier New", monospace';
       ctx.fillText(`ALTURA: ${Math.floor(state.alturaMaxima / 10)}m`, 20, 30);
+      ctx.fillText("VIDAS: ", 20, 50);
       
-      const vAgua = (agua.speed * 10).toFixed(1);
-      ctx.fillText(`AGUA: ${vAgua} km/h`, 20, 50);
+      for (let i = 0; i < state.vidas; i++) {
+        ctx.fillText("❤️", 85 + (i * 25), 50);
+      }
 
       loopId = requestAnimationFrame(gameLoop);
     };
