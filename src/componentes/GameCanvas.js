@@ -1,3 +1,4 @@
+// src/componentes/GameCanvas.js
 'use client';
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 
@@ -6,12 +7,14 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
   
   // ESTADO FÍSICO INTEGRADO DEL JUEGO
   const gameState = useRef({
-    personaje: { x: 200, y: 400, vx: 1.0, vy: 0, size: 20, enSuelo: false },
+    // vx inicializado en 0 porque ahora depende de las flechas
+    personaje: { x: 380, y: 400, vx: 0, vy: 0, size: 20, enSuelo: false },
     plataformas: [],
     camaraY: 0,
     alturaMaxima: 0, 
     gravedad: 0.32,
     fuerzaSalto: -8.2,
+    velocidadCubo: 3.5, // Velocidad manual del cubo al presionar las flechas
     
     // CONTROL DEL DOBLE SALTO
     dobleSaltoDisponible: true,
@@ -23,7 +26,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     inmune: false 
   });
 
-  // DISPARADOR DE SALTO COMPATIBLE CON DOBLE SALTO
+  // DISPARADOR DE SALTO COMPATIBLE CON DOBLE SALTO (Solo Voz)
   useImperativeHandle(ref, () => ({
     triggerJump() {
       const state = gameState.current;
@@ -31,7 +34,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       
       if (isPaused) return;
 
-      // Primer salto desde una plataforma
       if (p.enSuelo) {
         p.vy = state.fuerzaSalto;
         p.enSuelo = false;
@@ -39,11 +41,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         state.puntoMasAltoAlcanzadoY = p.y;
         state.inmune = false;
       } 
-      // Segundo salto en el aire (Doble Salto)
       else if (state.dobleSaltoDisponible) {
         p.vy = state.fuerzaSalto * 0.82; 
         state.dobleSaltoDisponible = false; 
-        state.puntoMasAltoAlcanzadoY = p.y; // Resetea para evitar daño injusto
+        state.puntoMasAltoAlcanzadoY = p.y; 
       }
     }
   }));
@@ -56,6 +57,36 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
 
     const imagenFondo = new Image();
     imagenFondo.src = '/imagenes/fondo-torre.png';
+
+    // DETECTORES DE TECLAS PARA MOVIMIENTO HORIZONTAL (FLECHAS)
+    const teclasPresionadas = {};
+    
+    const manejarKeyDown = (e) => {
+      if (isPaused) return;
+      teclasPresionadas[e.code] = true;
+      actualizarVelocidadHorizontal();
+    };
+
+    const manejarKeyUp = (e) => {
+      teclasPresionadas[e.code] = false;
+      actualizarVelocidadHorizontal();
+    };
+
+    const actualizarVelocidadHorizontal = () => {
+      const state = gameState.current;
+      const p = state.personaje;
+      
+      if (teclasPresionadas['ArrowLeft']) {
+        p.vx = -state.velocidadCubo;
+      } else if (teclasPresionadas['ArrowRight']) {
+        p.vx = state.velocidadCubo;
+      } else {
+        p.vx = 0; // Se detiene si no se presiona ninguna flecha
+      }
+    };
+
+    window.addEventListener('keydown', manejarKeyDown);
+    window.addEventListener('keyup', manejarKeyUp);
 
     const generarPlataformasIniciales = () => {
       const lista = [];
@@ -90,12 +121,13 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       }
 
       // ==========================================
-      // A. FISICAS GENERALES
+      // A. FISICAS GENERALES (MOVIMIENTO Y LÍMITES)
       // ==========================================
       p.x += p.vx;
-      if (p.x <= 0 || p.x + p.size >= canvas.width) {
-        p.vx *= -1; 
-      }
+      
+      // Bloqueo de bordes para que no se salga de los 760px del canvas
+      if (p.x < 0) p.x = 0;
+      if (p.x + p.size > canvas.width) p.x = canvas.width - p.size;
 
       p.vy += state.gravedad;
       p.y += p.vy;
@@ -105,7 +137,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       }
 
       // ==========================================
-      // B. COLISIONES Y DAÑO POR CAÍDA
+      // B. COLISIONES
       // ==========================================
       p.enSuelo = false;
 
@@ -134,22 +166,18 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       }
 
       // ==========================================
-      // C. CAMARA FLUIDA BIDIRECCIONAL (EFECTO CAÍDA)
+      // C. CAMARA FLUIDA
       // ==========================================
-const limiteSuperior = canvas.height * 0.4; 
+      const limiteSuperior = canvas.height * 0.4; 
       const limiteInferior = canvas.height * 0.7; 
 
       if (p.y < limiteSuperior) {
         const desfase = limiteSuperior - p.y;
         p.y = limiteSuperior;
         
-        // La cámara física se mueve hacia abajo para mostrar lo de arriba
         state.camaraY += desfase;
-        
-        // CORRECCIÓN: Registramos la altura acumulada total de la cámara física
         const alturaActualCalculada = state.camaraY;
         
-        // Solo aumentamos la altura máxima si superamos el punto más alto de esta partida
         if (alturaActualCalculada > state.alturaMaxima) {
           state.alturaMaxima = alturaActualCalculada;
         }
@@ -164,11 +192,8 @@ const limiteSuperior = canvas.height * 0.4;
         const desfase = p.y - limiteInferior;
         p.y = limiteInferior;
         
-        // Al caer, la cámara física retrocede hacia arriba
         state.camaraY -= desfase; 
         state.puntoMasAltoAlcanzadoY -= desfase;
-
-        // YA NO RESTAMOS de state.alturaMaxima aquí, así se queda fija en tu récord
 
         for (let plat of state.plataformas) {
           plat.y -= desfase;
@@ -178,14 +203,12 @@ const limiteSuperior = canvas.height * 0.4;
       // ==========================================
       // D. CONDICIÓN DE GAME OVER
       // ==========================================
-     if (state.vidas <= 0) {
+      if (state.vidas <= 0) {
         cancelAnimationFrame(loopId);
         onGameOver(Math.floor(state.alturaMaxima / 10)); 
         return;
       }
 
-      // CONTROL DE VACÍO REAL: Si el suelo base inicial (plataformas[0]) 
-      // sube más allá de la mitad de la pantalla y el personaje está abajo, es muerte instantánea.
       if (state.plataformas[0] && state.plataformas[0].y < p.y) {
         cancelAnimationFrame(loopId);
         onGameOver(Math.floor(state.alturaMaxima / 10)); 
@@ -193,7 +216,7 @@ const limiteSuperior = canvas.height * 0.4;
       }
 
       // ==========================================
-      // E. RE-RENDERIZADO GRÁFICO
+      // E. RENDERIZADO
       // ==========================================
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -211,11 +234,9 @@ const limiteSuperior = canvas.height * 0.4;
         }
       }
 
-      // El personaje parpadea en rojo si es inmune temporal por caída
       ctx.fillStyle = state.inmune && Math.floor(Date.now() / 100) % 2 === 0 ? '#e53e3e' : '#ecc94b'; 
       ctx.fillRect(p.x, p.y, p.size, p.size);
 
-      // MARCADORES DE RENDIMIENTO
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 16px "Courier New", monospace';
       ctx.fillText(`ALTURA: ${Math.floor(state.alturaMaxima / 10)}m`, 20, 30);
@@ -231,15 +252,25 @@ const limiteSuperior = canvas.height * 0.4;
     imagenFondo.onload = () => { loopId = requestAnimationFrame(gameLoop); };
     imagenFondo.onerror = () => { loopId = requestAnimationFrame(gameLoop); };
 
-    return () => cancelAnimationFrame(loopId);
+    return () => {
+      cancelAnimationFrame(loopId);
+      window.removeEventListener('keydown', manejarKeyDown);
+      window.removeEventListener('keyup', manejarKeyUp);
+    };
   }, [onGameOver, isPaused]);
 
   return (
-    <canvas 
-      ref={canvasRef} 
-      width={400} 
+    <canvas
+      ref={canvasRef}
+      width={760} 
       height={600} 
-      style={{ border: '4px solid #2b6cb0', display: 'block', margin: '0 auto', borderRadius: '8px' }} 
+      style={{
+        display: 'block',
+        margin: '0 auto',
+        background: '#1a202c',
+        borderRadius: '8px',
+        border: '2px solid #4a5568'
+      }}
     />
   );
 });

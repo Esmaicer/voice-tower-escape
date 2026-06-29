@@ -7,7 +7,6 @@ export default function AudioCalibrator({ onJump }) {
 
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
-  // Aquí declaramos explícitamente streamRef para solucionar el error de la captura
   const streamRef = useRef(null); 
   const jorobaAntiBucle = useRef(false);
 

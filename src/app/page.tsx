@@ -117,7 +117,7 @@ export default function Home() {
     localStorage.setItem('vt_lista_jugadores', JSON.stringify(nuevaListaFiltrada));
   };
 
-  // 6. GESTIÓN DE SALTOS Y FIN DE JUEGO
+  // 6. GESTIÓN DE SALTOS GENERAL
   const handleJumpTrigger = useCallback(() => {
     if (gameCanvasRef.current && !isPaused) {
       gameCanvasRef.current.triggerJump();
@@ -135,6 +135,7 @@ export default function Home() {
     setIsPaused(false);
   };
 
+  // Escucha la barra espaciadora SOLO si el método de control es 'teclado'
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isPlaying && !isPaused && controlMethod === 'teclado' && event.code === 'Space') {
@@ -148,10 +149,18 @@ export default function Home() {
 
   return (
     <main style={{ 
-      maxWidth: '600px', margin: '20px auto', padding: '30px 20px', fontFamily: '"Courier New", Courier, monospace', 
+      maxWidth: '800px', 
+      margin: '20px auto', 
+      padding: '30px 20px', 
+      fontFamily: '"Courier New", Courier, monospace', 
       backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)), url("/imagenes/fondo-torre.png")',
-      backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', color: '#fff',
-      borderRadius: '12px', boxShadow: '0px 0px 25px rgba(43, 108, 176, 0.4)', border: '3px solid #2b6cb0',
+      backgroundSize: 'cover', 
+      backgroundPosition: 'center', 
+      backgroundRepeat: 'no-repeat', 
+      color: '#fff',
+      borderRadius: '12px', 
+      boxShadow: '0px 0px 25px rgba(43, 108, 176, 0.4)', 
+      border: '3px solid #2b6cb0',
       position: 'relative'
     }}>
       
@@ -188,7 +197,7 @@ export default function Home() {
                 value={nuevoNombre}
                 onChange={(e) => setNuevoNombre(e.target.value)}
                 maxLength={12}
-                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #4a5568', background: '#2d3748', color: '#fff', outline: 'none' }}
+                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #4a5568', background: '#2d3748', color: '#fff', outline: '#3182ce' }}
               />
               <button type="submit" style={{ padding: '8px 15px', background: '#3182ce', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
                 Anadir
@@ -214,18 +223,24 @@ export default function Home() {
             RECORD DE <strong>{jugadorActivo.toUpperCase()}</strong> ({controlMethod.toUpperCase()}): {highScore} METROS
           </div>
 
+          {/* BOTONES PARA ELEGIR EL MODO DE JUEGO */}
           <div style={{ display: 'flex', gap: '10px', background: '#2d3748', padding: '8px', borderRadius: '8px' }}>
             <button onClick={() => setControlMethod('voz')} style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: controlMethod === 'voz' ? '#ecc94b' : '#4a5568', color: controlMethod === 'voz' ? '#000' : '#fff' }}>Voz</button>
             <button onClick={() => setControlMethod('teclado')} style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: controlMethod === 'teclado' ? '#ecc94b' : '#4a5568', color: controlMethod === 'teclado' ? '#000' : '#fff' }}>Teclado</button>
           </div>
 
-          <button style={{ padding: '15px 40px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', background: '#38a169', color: 'white', border: 'none', borderRadius: '6px', boxShadow: '0 5px #22543d' }} onClick={() => { setIsPlaying(true); setIsPaused(false); }}>INICIAR JUEGO!</button>
+          <button style={{ padding: '15px 40px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', background: '#38a169', color: 'white', border: 'none', borderRadius: '6px', boxShadow: '0 5px #22543d' }} onClick={() => { setIsPlaying(true); setIsPaused(false); }}>¡INICIAR JUEGO!</button>
           <button style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px' }} onClick={() => setShowSettings(!showSettings)}>{showSettings ? 'Ocultar Ajustes' : 'Configurar Dispositivo'}</button>
 
           {showSettings && (
             <div style={{ width: '100%', background: '#1a202c', padding: '15px', borderRadius: '8px', border: '1px solid #4a5568' }}>
-              <p style={{ margin: '0 0 10px 0' }}>Modo de juego: <strong>{controlMethod === 'voz' ? 'Voz' : 'Teclado'}</strong></p>
-              <AudioCalibrator onJump={() => {}} />
+              <p style={{ margin: '0 0 10px 0' }}>Modo seleccionado: <strong>{controlMethod === 'voz' ? 'Voz' : 'Teclado'}</strong></p>
+              <p style={{ margin: '0', fontSize: '14px', color: '#a0aec0' }}>
+                {controlMethod === 'voz' 
+                  ? 'Controles: Moverse con Flechas Laterales | Saltar con Voz' 
+                  : 'Controles: Moverse con Flechas Laterales | Saltar con Espacio'}
+              </p>
+              {controlMethod === 'voz' && <AudioCalibrator onJump={() => {}} />}
             </div>
           )}
         </div>
@@ -260,12 +275,12 @@ export default function Home() {
             Explorador activo: <strong style={{ color: '#ecc94b' }}>{jugadorActivo}</strong>
           </div>
 
-          {/* BARRA DE CALIBRACIÓN FIJADA EN EL LATERAL NEGRO IZQUIERDO DE LA VENTANA */}
+          {/* BARRA DE CALIBRACIÓN SOLO APARECE EN LA ZONA NEGRA SI EL MODO ES 'VOZ' */}
           {controlMethod === 'voz' && !isPaused && (
             <div style={{ 
               position: 'fixed', 
               top: '180px', 
-              left: 'calc(50% - 490px)', 
+              left: 'calc(50% - 580px)', 
               zIndex: 100, 
               background: '#1a202c', 
               padding: '12px', 
