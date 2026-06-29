@@ -61,21 +61,21 @@ export default function Home() {
       if (muteRef.current) {
         audioTagRef.current.volume = 0;
       } else {
-        audioTagRef.current.volume = isPlaying ? 0.2 : 0.6;
+        audioTagRef.current.volume = isPlaying ? 0.3 : 0.6;
       }
     }
   }, [isPlaying]);
 
-  // 3. CAMBIO DE RÉCORDS INDIVIDUALES
+  // 3. CARGAR EL RÉCORD ESPECÍFICO SEGÚN EL MÉTODO DE CONTROL Y JUGADOR
   useEffect(() => {
-    const recordEspecifico = localStorage.getItem(`vt_highscore_${jugadorActivo}`);
+    const recordEspecifico = localStorage.getItem(`vt_highscore_${jugadorActivo}_${controlMethod}`);
     if (recordEspecifico) {
       setHighScore(parseInt(recordEspecifico, 10));
     } else {
       setHighScore(0);
     }
     localStorage.setItem('vt_jugador_activo', jugadorActivo);
-  }, [jugadorActivo]);
+  }, [jugadorActivo, controlMethod]);
 
   // 4. FUNCIÓN INTERACTIVA DE SILENCIO
   const toggleMute = (e: React.MouseEvent) => {
@@ -90,7 +90,7 @@ export default function Home() {
       if (estadoMuteActual) {
         audioTagRef.current.volume = 0;
       } else {
-        audioTagRef.current.volume = isPlaying ? 0.2 : 0.6;
+        audioTagRef.current.volume = isPlaying ? 0.3 : 0.6;
       }
 
       if (botonMuteRef.current) {
@@ -117,7 +117,7 @@ export default function Home() {
     localStorage.setItem('vt_lista_jugadores', JSON.stringify(nuevaListaFiltrada));
   };
 
-  // 6. CONTROLADORES DE JUEGO Y SALTOS
+  // 6. GESTIÓN DE SALTOS Y FIN DE JUEGO
   const handleJumpTrigger = useCallback(() => {
     if (gameCanvasRef.current && !isPaused) {
       gameCanvasRef.current.triggerJump();
@@ -128,7 +128,7 @@ export default function Home() {
     setCurrentScore(scoreFinal); 
     if (scoreFinal > highScore) {
       setHighScore(scoreFinal);
-      localStorage.setItem(`vt_highscore_${jugadorActivo}`, scoreFinal.toString());
+      localStorage.setItem(`vt_highscore_${jugadorActivo}_${controlMethod}`, scoreFinal.toString());
     }
     setIsPlaying(false);
     setIsGameOver(true);
@@ -209,8 +209,9 @@ export default function Home() {
             </div>
           </div>
 
+          {/* MARCADOR SEPARADO POR MÉTODO DE CONTROL */}
           <div style={{ background: '#2d3748', padding: '12px 25px', borderRadius: '8px', border: '2px dashed #ecc94b', fontSize: '1.1rem', color: '#ecc94b', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
-            RECORD DE <strong>{jugadorActivo.toUpperCase()}</strong>: {highScore} METROS
+            RECORD DE <strong>{jugadorActivo.toUpperCase()}</strong> ({controlMethod.toUpperCase()}): {highScore} METROS
           </div>
 
           <div style={{ display: 'flex', gap: '10px', background: '#2d3748', padding: '8px', borderRadius: '8px' }}>
@@ -259,12 +260,12 @@ export default function Home() {
             Explorador activo: <strong style={{ color: '#ecc94b' }}>{jugadorActivo}</strong>
           </div>
 
-          {/* CONTENEDOR MOVIDO A LA ZONA NEGRA LATERAL FUERA DEL JUEGO */}
+          {/* BARRA DE CALIBRACIÓN FIJADA EN EL LATERAL NEGRO IZQUIERDO DE LA VENTANA */}
           {controlMethod === 'voz' && !isPaused && (
             <div style={{ 
               position: 'fixed', 
               top: '180px', 
-              left: 'calc(50% - 490px)', // Esto lo empuja automáticamente hacia la zona negra de la izquierda
+              left: 'calc(50% - 490px)', 
               zIndex: 100, 
               background: '#1a202c', 
               padding: '12px', 
