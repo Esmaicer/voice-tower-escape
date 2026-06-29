@@ -5,48 +5,37 @@ import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
   const canvasRef = useRef(null);
   
-  // ESTADO FÍSICO INTEGRADO DEL JUEGO
   const gameState = useRef({
     personaje: { x: 380, y: 400, vx: 0, vy: 0, size: 20, enSuelo: false },
     plataformas: [],
     camaraY: 0,
-    alturaMaxima: 0, 
     gravedad: 0.32,
     fuerzaSalto: -8.2,
     velocidadCubo: 3.5, 
     
-    // SISTEMA DE NIVELES (3 NIVELES EN TOTAL)
     nivelActual: 1,
-    metrosParaSiguienteNivel: 50, 
+    metrosParaSiguienteNivel: 200, 
 
-    // CONTROL DEL DOBLE SALTO
     dobleSaltoDisponible: true,
-
-    // SISTEMA DE VIDAS Y CAÍDAS CRÍTICAS
     vidas: 5,
     puntoMasAltoAlcanzadoY: 400, 
     caidaCriticaDistancia: 200,
     inmune: false 
   });
 
-  // DISPARADOR DE SALTO COMPATIBLE CON DOBLE SALTO
   useImperativeHandle(ref, () => ({
     triggerJump() {
       const state = gameState.current;
       const p = state.personaje;
-      
       if (isPaused) return;
 
-      // Primer salto desde una plataforma
       if (p.enSuelo) {
         p.vy = state.fuerzaSalto;
         p.enSuelo = false;
         state.dobleSaltoDisponible = true; 
         state.puntoMasAltoAlcanzadoY = p.y;
         state.inmune = false;
-      } 
-      // Segundo salto en el aire (Doble Salto)
-      else if (state.dobleSaltoDisponible) {
+      } else if (state.dobleSaltoDisponible) {
         p.vy = state.fuerzaSalto * 0.85; 
         state.dobleSaltoDisponible = false; 
         state.puntoMasAltoAlcanzadoY = p.y; 
@@ -62,14 +51,13 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
 
     const fondosNiveles = {
       1: '/imagenes/fondo-torre.png',
-      2: '/imagenes/fondo-torre2.png',
-      3: '/imagenes/fondo-torre3.png'
+      2: '/imagenes/fondo-nivel2.png',
+      3: '/imagenes/fondo-nivel3.png'
     };
 
     const imagenFondo = new Image();
     imagenFondo.src = fondosNiveles[gameState.current.nivelActual];
 
-    // DETECTORES DE TECLAS COMPARTIDOS
     const teclasPresionadas = {};
     
     const manejarKeyDown = (e) => {
@@ -98,7 +86,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     window.addEventListener('keydown', manejarKeyDown);
     window.addEventListener('keyup', manejarKeyUp);
 
-    // GENERADOR DE PLATAFORMAS (Solo si no están creadas)
     if (gameState.current.plataformas.length === 0) {
       const state = gameState.current;
       const lista = [];
@@ -113,13 +100,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         lista.push({ x, y: ultimaY, width, height: 12, esPortal: false });
       }
 
-      lista.push({ 
-        x: (canvas.width / 2) - 60, 
-        y: limiteYPortal, 
-        width: 120, 
-        height: 15, 
-        esPortal: true 
-      });
+      lista.push({ x: (canvas.width / 2) - 60, y: limiteYPortal, width: 120, height: 15, esPortal: true });
       state.plataformas = lista;
     }
 
@@ -137,14 +118,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         lista.push({ x, y: ultimaY, width, height: 12, esPortal: false });
       }
 
-      lista.push({ 
-        x: (canvas.width / 2) - 60, 
-        y: limiteYPortal, 
-        width: 120, 
-        height: 15, 
-        esPortal: true 
-      });
-
+      lista.push({ x: (canvas.width / 2) - 60, y: limiteYPortal, width: 120, height: 15, esPortal: true });
       state.plataformas = lista;
       state.personaje.x = 380;
       state.personaje.y = 400;
@@ -165,14 +139,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         ctx.font = 'bold 24px "Courier New", monospace';
         ctx.textAlign = 'center';
         ctx.fillText("JUEGO EN PAUSA", canvas.width / 2, canvas.height / 2);
-        ctx.textAlign = 'left'; 
         loopId = requestAnimationFrame(gameLoop);
         return;
       }
 
-      // ==========================================
-      // A. FISICAS GENERALES
-      // ==========================================
       p.x += p.vx;
       if (p.x < 0) p.x = 0;
       if (p.x + p.size > canvas.width) p.x = canvas.width - p.size;
@@ -184,18 +154,13 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         state.puntoMasAltoAlcanzadoY = p.y;
       }
 
-      // ==========================================
-      // B. COLISIONES
-      // ==========================================
       p.enSuelo = false;
 
       if (p.vy >= 0) {
         for (let plat of state.plataformas) {
           if (
-            p.x + p.size > plat.x &&
-            p.x < plat.x + plat.width &&
-            p.y + p.size >= plat.y &&
-            p.y + p.size <= plat.y + 15
+            p.x + p.size > plat.x && p.x < plat.x + plat.width &&
+            p.y + p.size >= plat.y && p.y + p.size <= plat.y + 15
           ) {
             if (plat.esPortal) {
               p.vy = 0;
@@ -205,32 +170,21 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
               if (state.nivelActual < 3) {
                 state.nivelActual += 1;
                 state.camaraY = 0;
-                state.alturaMaxima = (state.nivelActual - 1) * (state.metrosParaSiguienteNivel * 10);
                 
                 ctx.fillStyle = '#1a202c';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ecc94b';
                 ctx.font = 'bold 28px "Courier New", monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(`¡PORTAL COMPLETADO! CARGANDO NIVEL ${state.nivelActual}`, canvas.width / 2, canvas.height / 2);
+                ctx.fillText(`¡PORTAL COMPLETADO! ESCENARIO ${state.nivelActual}`, canvas.width / 2, canvas.height / 2);
                 
                 setTimeout(() => {
                   generarPlataformasDelNivel();
                   loopId = requestAnimationFrame(gameLoop);
                 }, 1200);
               } else {
-                ctx.fillStyle = '#1a202c';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#48bb78';
-                ctx.font = 'bold 32px "Courier New", monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText("¡VICTORIA ABSOLUTA EN LA TORRE!", canvas.width / 2, canvas.height / 2 - 20);
-                ctx.font = '18px "Courier New", monospace';
-                ctx.fillStyle = '#fff';
-                ctx.fillText("Superaste todos los niveles con éxito.", canvas.width / 2, canvas.height / 2 + 30);
-                setTimeout(() => {
-                  onGameOver(Math.floor(state.alturaMaxima / 10));
-                }, 3000);
+                // VALOR 4 INDICA VICTORIA TOTAL SOBRE EL NIVEL 3
+                onGameOver(4);
               }
               return;
             }
@@ -251,60 +205,30 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         }
       }
 
-      // ==========================================
-      // C. CAMARA FLUIDA
-      // ==========================================
       const limiteSuperior = canvas.height * 0.4; 
       const limiteInferior = canvas.height * 0.7; 
 
       if (p.y < limiteSuperior) {
         const desfase = limiteSuperior - p.y;
         p.y = limiteSuperior;
-        
         state.camaraY += desfase;
-        const baseNivelAnterior = (state.nivelActual - 1) * (state.metrosParaSiguienteNivel * 10);
-        const alturaActualCalculada = baseNivelAnterior + state.camaraY;
-        
-        if (alturaActualCalculada > state.alturaMaxima) {
-          state.alturaMaxima = alturaActualCalculada;
-        }
-
         state.puntoMasAltoAlcanzadoY += desfase;
-
-        for (let plat of state.plataformas) {
-          plat.y += desfase;
-        }
+        for (let plat of state.plataformas) plat.y += desfase;
       } 
       else if (p.y > limiteInferior) {
         const desfase = p.y - limiteInferior;
         p.y = limiteInferior;
-        
         state.camaraY -= desfase; 
         state.puntoMasAltoAlcanzadoY -= desfase;
-
-        for (let plat of state.plataformas) {
-          plat.y -= desfase;
-        }
+        for (let plat of state.plataformas) plat.y -= desfase;
       }
 
-      // ==========================================
-      // D. CONDICIÓN DE GAME OVER
-      // ==========================================
-      if (state.vidas <= 0) {
+      if (state.vidas <= 0 || (state.plataformas[0] && state.plataformas[0].y < p.y)) {
         cancelAnimationFrame(loopId);
-        onGameOver(Math.floor(state.alturaMaxima / 10)); 
+        onGameOver(state.nivelActual); // Retorna el nivel exacto donde perdiste
         return;
       }
 
-      if (state.plataformas[0] && state.plataformas[0].y < p.y) {
-        cancelAnimationFrame(loopId);
-        onGameOver(Math.floor(state.alturaMaxima / 10)); 
-        return;
-      }
-
-      // ==========================================
-      // E. RENDERIZADO GRÁFICO CONTROLADO
-      // ==========================================
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       if (imagenFondo.complete && imagenFondo.naturalWidth !== 0) {
@@ -326,7 +250,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
             ctx.fillRect(plat.x + 5, plat.y - 12, plat.width - 10, 12); 
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 10px monospace';
-            ctx.fillText("PORTAL SIG. NIVEL", plat.x + 8, plat.y + 11);
+            ctx.textAlign = 'center';
+            ctx.fillText("PORTAL", plat.x + plat.width / 2, plat.y + 11);
           } else {
             ctx.fillStyle = '#4a5568';
             ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
@@ -339,20 +264,17 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       ctx.fillStyle = state.inmune && Math.floor(Date.now() / 100) % 2 === 0 ? '#e53e3e' : '#ecc94b'; 
       ctx.fillRect(p.x, p.y, p.size, p.size);
 
-      // FORZAR ALINEACIÓN IZQUIERDA CON MARGEN ANCHO (X: 80)
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 15px "Courier New", monospace';
-      ctx.textAlign = 'left'; // Asegura que empiece limpio hacia la derecha
-      
-      ctx.fillText(`ALTURA: ${Math.floor(state.alturaMaxima / 10)}m`, 80, 35);
-      
+      // INTERFAZ LIMPIA DE TEXTOS (Margen amplio a X: 80 sin metros)
       ctx.fillStyle = '#63b3ed';
-      ctx.fillText(`NIVEL ACTUAL: ${state.nivelActual}/3`, 80, 55);
+      ctx.font = 'bold 16px "Courier New", monospace';
+      ctx.textAlign = 'left';
+      
+      ctx.fillText(`ESCENARIO ACTUAL: ${state.nivelActual}/3`, 80, 35);
       
       ctx.fillStyle = '#fff';
-      ctx.fillText("VIDAS: ", 80, 75);
+      ctx.fillText("VIDAS: ", 80, 55);
       for (let i = 0; i < state.vidas; i++) {
-        ctx.fillText("❤️", 145 + (i * 22), 75); // Desfase de corazones adaptado a la nueva X
+        ctx.fillText("❤️", 145 + (i * 22), 55);
       }
 
       loopId = requestAnimationFrame(gameLoop);
@@ -365,22 +287,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       window.removeEventListener('keydown', manejarKeyDown);
       window.removeEventListener('keyup', manejarKeyUp);
     };
-    // ESCUCHADORES DINÁMICOS: Se fuerza el refresco de variables en caliente
   }, [onGameOver, isPaused]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={760} 
-      height={600} 
-      style={{
-        display: 'block',
-        margin: '0 auto',
-        background: '#1a202c',
-        borderRadius: '8px',
-        border: '2px solid #4a5568'
-      }}
-    />
+    <canvas ref={canvasRef} width={760} height={600} style={{ display: 'block', margin: '0 auto', background: '#1a202c', borderRadius: '8px', border: '2px solid #4a5568' }} />
   );
 });
 
