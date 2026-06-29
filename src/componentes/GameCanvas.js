@@ -7,15 +7,18 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
   
   // ESTADO FÍSICO INTEGRADO DEL JUEGO
   const gameState = useRef({
-    // vx inicializado en 0 porque ahora depende de las flechas
     personaje: { x: 380, y: 400, vx: 0, vy: 0, size: 20, enSuelo: false },
     plataformas: [],
     camaraY: 0,
     alturaMaxima: 0, 
     gravedad: 0.32,
     fuerzaSalto: -8.2,
-    velocidadCubo: 3.5, // Velocidad manual del cubo al presionar las flechas
+    velocidadCubo: 3.5, 
     
+    // SISTEMA DE NIVELES (3 NIVELES EN TOTAL)
+    nivelActual: 1,
+    metrosParaSiguienteNivel: 50, 
+
     // CONTROL DEL DOBLE SALTO
     dobleSaltoDisponible: true,
 
@@ -26,7 +29,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     inmune: false 
   });
 
-  // DISPARADOR DE SALTO COMPATIBLE CON DOBLE SALTO (Solo Voz)
+  // DISPARADOR DE SALTO COMPATIBLE CON DOBLE SALTO
   useImperativeHandle(ref, () => ({
     triggerJump() {
       const state = gameState.current;
@@ -34,6 +37,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       
       if (isPaused) return;
 
+      // Primer salto desde una plataforma
       if (p.enSuelo) {
         p.vy = state.fuerzaSalto;
         p.enSuelo = false;
@@ -41,8 +45,9 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         state.puntoMasAltoAlcanzadoY = p.y;
         state.inmune = false;
       } 
+      // Segundo salto en el aire (Doble Salto)
       else if (state.dobleSaltoDisponible) {
-        p.vy = state.fuerzaSalto * 0.82; 
+        p.vy = state.fuerzaSalto * 0.85; 
         state.dobleSaltoDisponible = false; 
         state.puntoMasAltoAlcanzadoY = p.y; 
       }
@@ -55,10 +60,16 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     const ctx = canvas.getContext('2d');
     let loopId;
 
-    const imagenFondo = new Image();
-    imagenFondo.src = '/imagenes/fondo-torre.png';
+    const fondosNiveles = {
+      1: '/imagenes/fondo-torre.png',
+      2: '/imagenes/fondo-torre2.png',
+      3: '/imagenes/fondo-torre3.png'
+    };
 
-    // DETECTORES DE TECLAS PARA MOVIMIENTO HORIZONTAL (FLECHAS)
+    const imagenFondo = new Image();
+    imagenFondo.src = fondosNiveles[gameState.current.nivelActual];
+
+    // DETECTORES DE TECLAS COMPARTIDOS
     const teclasPresionadas = {};
     
     const manejarKeyDown = (e) => {
@@ -75,34 +86,73 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     const actualizarVelocidadHorizontal = () => {
       const state = gameState.current;
       const p = state.personaje;
-      
       if (teclasPresionadas['ArrowLeft']) {
         p.vx = -state.velocidadCubo;
       } else if (teclasPresionadas['ArrowRight']) {
         p.vx = state.velocidadCubo;
       } else {
-        p.vx = 0; // Se detiene si no se presiona ninguna flecha
+        p.vx = 0;
       }
     };
 
     window.addEventListener('keydown', manejarKeyDown);
     window.addEventListener('keyup', manejarKeyUp);
 
-    const generarPlataformasIniciales = () => {
+    // GENERADOR DE PLATAFORMAS (Solo si no están creadas)
+    if (gameState.current.plataformas.length === 0) {
+      const state = gameState.current;
       const lista = [];
-      lista.push({ x: 0, y: 520, width: canvas.width, height: 15 });
-      
+      lista.push({ x: 0, y: 520, width: canvas.width, height: 15, esPortal: false });
+      const limiteYPortal = 520 - (state.metrosParaSiguienteNivel * 10);
       let ultimaY = 520;
-      for (let i = 0; i < 150; i++) { 
+      
+      while (ultimaY > limiteYPortal + 150) {
         ultimaY -= Math.floor(Math.random() * 15) + 45; 
         const width = Math.floor(Math.random() * 30) + 75; 
         const x = Math.floor(Math.random() * (canvas.width - width));
-        lista.push({ x, y: ultimaY, width, height: 12 });
+        lista.push({ x, y: ultimaY, width, height: 12, esPortal: false });
       }
-      gameState.current.plataformas = lista;
-    };
 
-    generarPlataformasIniciales();
+      lista.push({ 
+        x: (canvas.width / 2) - 60, 
+        y: limiteYPortal, 
+        width: 120, 
+        height: 15, 
+        esPortal: true 
+      });
+      state.plataformas = lista;
+    }
+
+    const generarPlataformasDelNivel = () => {
+      const state = gameState.current;
+      const lista = [];
+      lista.push({ x: 0, y: 520, width: canvas.width, height: 15, esPortal: false });
+      const limiteYPortal = 520 - (state.metrosParaSiguienteNivel * 10);
+      let ultimaY = 520;
+      
+      while (ultimaY > limiteYPortal + 150) {
+        ultimaY -= Math.floor(Math.random() * 15) + 45; 
+        const width = Math.floor(Math.random() * 30) + 75; 
+        const x = Math.floor(Math.random() * (canvas.width - width));
+        lista.push({ x, y: ultimaY, width, height: 12, esPortal: false });
+      }
+
+      lista.push({ 
+        x: (canvas.width / 2) - 60, 
+        y: limiteYPortal, 
+        width: 120, 
+        height: 15, 
+        esPortal: true 
+      });
+
+      state.plataformas = lista;
+      state.personaje.x = 380;
+      state.personaje.y = 400;
+      state.personaje.vx = 0;
+      state.personaje.vy = 0;
+      state.puntoMasAltoAlcanzadoY = 400;
+      imagenFondo.src = fondosNiveles[state.nivelActual];
+    };
 
     const gameLoop = () => {
       const state = gameState.current;
@@ -121,11 +171,9 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       }
 
       // ==========================================
-      // A. FISICAS GENERALES (MOVIMIENTO Y LÍMITES)
+      // A. FISICAS GENERALES
       // ==========================================
       p.x += p.vx;
-      
-      // Bloqueo de bordes para que no se salga de los 760px del canvas
       if (p.x < 0) p.x = 0;
       if (p.x + p.size > canvas.width) p.x = canvas.width - p.size;
 
@@ -147,8 +195,46 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
             p.x + p.size > plat.x &&
             p.x < plat.x + plat.width &&
             p.y + p.size >= plat.y &&
-            p.y + p.size <= plat.y + 12
+            p.y + p.size <= plat.y + 15
           ) {
+            if (plat.esPortal) {
+              p.vy = 0;
+              p.vx = 0;
+              cancelAnimationFrame(loopId);
+
+              if (state.nivelActual < 3) {
+                state.nivelActual += 1;
+                state.camaraY = 0;
+                state.alturaMaxima = (state.nivelActual - 1) * (state.metrosParaSiguienteNivel * 10);
+                
+                ctx.fillStyle = '#1a202c';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ecc94b';
+                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`¡PORTAL COMPLETADO! CARGANDO NIVEL ${state.nivelActual}`, canvas.width / 2, canvas.height / 2);
+                
+                setTimeout(() => {
+                  generarPlataformasDelNivel();
+                  loopId = requestAnimationFrame(gameLoop);
+                }, 1200);
+              } else {
+                ctx.fillStyle = '#1a202c';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#48bb78';
+                ctx.font = 'bold 32px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText("¡VICTORIA ABSOLUTA EN LA TORRE!", canvas.width / 2, canvas.height / 2 - 20);
+                ctx.font = '18px "Courier New", monospace';
+                ctx.fillStyle = '#fff';
+                ctx.fillText("Superaste todos los niveles con éxito.", canvas.width / 2, canvas.height / 2 + 30);
+                setTimeout(() => {
+                  onGameOver(Math.floor(state.alturaMaxima / 10));
+                }, 3000);
+              }
+              return;
+            }
+
             const distanciaCaida = p.y - state.puntoMasAltoAlcanzadoY;
             if (distanciaCaida >= state.caidaCriticaDistancia && !state.inmune) {
               state.vidas -= 1;
@@ -176,7 +262,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         p.y = limiteSuperior;
         
         state.camaraY += desfase;
-        const alturaActualCalculada = state.camaraY;
+        const baseNivelAnterior = (state.nivelActual - 1) * (state.metrosParaSiguienteNivel * 10);
+        const alturaActualCalculada = baseNivelAnterior + state.camaraY;
         
         if (alturaActualCalculada > state.alturaMaxima) {
           state.alturaMaxima = alturaActualCalculada;
@@ -216,47 +303,69 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       }
 
       // ==========================================
-      // E. RENDERIZADO
+      // E. RENDERIZADO GRÁFICO CONTROLADO
       // ==========================================
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      let fondoY = (state.camaraY) % canvas.height;
-      if (fondoY < 0) fondoY += canvas.height; 
-      ctx.drawImage(imagenFondo, 0, fondoY, canvas.width, canvas.height);
-      ctx.drawImage(imagenFondo, 0, fondoY - canvas.height, canvas.width, canvas.height);
+      if (imagenFondo.complete && imagenFondo.naturalWidth !== 0) {
+        let fondoY = (state.camaraY) % canvas.height;
+        if (fondoY < 0) fondoY += canvas.height; 
+        ctx.drawImage(imagenFondo, 0, fondoY, canvas.width, canvas.height);
+        ctx.drawImage(imagenFondo, 0, fondoY - canvas.height, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = '#111827'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
       for (let plat of state.plataformas) {
-        if (plat.y >= -20 && plat.y <= canvas.height + 20) {
-          ctx.fillStyle = '#4a5568';
-          ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-          ctx.fillStyle = '#48bb78';
-          ctx.fillRect(plat.x, plat.y, plat.width, 3);
+        if (plat.y >= -40 && plat.y <= canvas.height + 40) {
+          if (plat.esPortal) {
+            ctx.fillStyle = '#3182ce';
+            ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+            ctx.fillStyle = '#63b3ed';
+            ctx.fillRect(plat.x + 5, plat.y - 12, plat.width - 10, 12); 
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px monospace';
+            ctx.fillText("PORTAL SIG. NIVEL", plat.x + 8, plat.y + 11);
+          } else {
+            ctx.fillStyle = '#4a5568';
+            ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+            ctx.fillStyle = '#48bb78';
+            ctx.fillRect(plat.x, plat.y, plat.width, 3);
+          }
         }
       }
 
       ctx.fillStyle = state.inmune && Math.floor(Date.now() / 100) % 2 === 0 ? '#e53e3e' : '#ecc94b'; 
       ctx.fillRect(p.x, p.y, p.size, p.size);
 
+      // FORZAR ALINEACIÓN IZQUIERDA CON MARGEN ANCHO (X: 80)
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 16px "Courier New", monospace';
-      ctx.fillText(`ALTURA: ${Math.floor(state.alturaMaxima / 10)}m`, 20, 30);
-      ctx.fillText("VIDAS: ", 20, 50);
+      ctx.font = 'bold 15px "Courier New", monospace';
+      ctx.textAlign = 'left'; // Asegura que empiece limpio hacia la derecha
       
+      ctx.fillText(`ALTURA: ${Math.floor(state.alturaMaxima / 10)}m`, 80, 35);
+      
+      ctx.fillStyle = '#63b3ed';
+      ctx.fillText(`NIVEL ACTUAL: ${state.nivelActual}/3`, 80, 55);
+      
+      ctx.fillStyle = '#fff';
+      ctx.fillText("VIDAS: ", 80, 75);
       for (let i = 0; i < state.vidas; i++) {
-        ctx.fillText("❤️", 85 + (i * 25), 50);
+        ctx.fillText("❤️", 145 + (i * 22), 75); // Desfase de corazones adaptado a la nueva X
       }
 
       loopId = requestAnimationFrame(gameLoop);
     };
 
-    imagenFondo.onload = () => { loopId = requestAnimationFrame(gameLoop); };
-    imagenFondo.onerror = () => { loopId = requestAnimationFrame(gameLoop); };
+    loopId = requestAnimationFrame(gameLoop);
 
     return () => {
       cancelAnimationFrame(loopId);
       window.removeEventListener('keydown', manejarKeyDown);
       window.removeEventListener('keyup', manejarKeyUp);
     };
+    // ESCUCHADORES DINÁMICOS: Se fuerza el refresco de variables en caliente
   }, [onGameOver, isPaused]);
 
   return (
