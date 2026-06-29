@@ -6,7 +6,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
   
   // ESTADO FÍSICO INTEGRADO DEL JUEGO
   const gameState = useRef({
-    personaje: { x: 200, y: 400, vx: 1.6, vy: 0, size: 20, enSuelo: false },
+    personaje: { x: 200, y: 400, vx: 1.0, vy: 0, size: 20, enSuelo: false },
     plataformas: [],
     camaraY: 0,
     alturaMaxima: 0, 
@@ -17,9 +17,9 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     dobleSaltoDisponible: true,
 
     // SISTEMA DE VIDAS Y CAÍDAS CRÍTICAS
-    vidas: 2,
+    vidas: 5,
     puntoMasAltoAlcanzadoY: 400, 
-    caidaCriticaDistancia: 185,
+    caidaCriticaDistancia: 200,
     inmune: false 
   });
 

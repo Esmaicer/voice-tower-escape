@@ -41,14 +41,13 @@ export default function Home() {
       }
     }
 
-    // Configuración de reproducción ante primer clic
     const forzarReproduccion = () => {
       if (audioTagRef.current && !isPlaying) {
         audioTagRef.current.play()
           .then(() => {
             window.removeEventListener('click', forzarReproduccion);
           })
-          .catch(() => console.log("Permiso bloqueado temporalmente por el navegador"));
+          .catch(() => console.log("Permiso de audio diferido"));
       }
     };
 
@@ -56,7 +55,7 @@ export default function Home() {
     return () => window.removeEventListener('click', forzarReproduccion);
   }, [isPlaying]);
 
-  // 2. ATENUAR VOLUMEN EN gameplay
+  // 2. ATENUAR VOLUMEN EN GAMEPLAY
   useEffect(() => {
     if (audioTagRef.current) {
       if (muteRef.current) {
@@ -78,7 +77,7 @@ export default function Home() {
     localStorage.setItem('vt_jugador_activo', jugadorActivo);
   }, [jugadorActivo]);
 
-  // 4. FUNCIÓN INTERACTIVA DE SILENCIO (Modifica el elemento directamente)
+  // 4. FUNCIÓN INTERACTIVA DE SILENCIO
   const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -156,22 +155,15 @@ export default function Home() {
       position: 'relative'
     }}>
       
-      {/* COMPONENTE DE AUDIO HTML5 EMBEBIDO DE FORMA SEGURA */}
-      <audio 
-        ref={audioTagRef} 
-        src="/sonido/dark-souls-golem.mp3" 
-        loop 
-        preload="auto"
-      />
+      <audio ref={audioTagRef} src="/sonido/dark-souls-golem.mp3" loop preload="auto" />
 
-      {/* BOTÓN MUTE CONTENIDO */}
+      {/* BOTÓN MUTE */}
       <button 
         ref={botonMuteRef}
         onClick={(e) => toggleMute(e)}
         style={{
           position: 'absolute', top: '15px', right: '15px', background: '#2d3748', border: '1px solid #4a5568',
           color: 'white', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontSize: '12px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box',
           zIndex: 999, fontWeight: 'bold'
         }}
       >
@@ -232,13 +224,13 @@ export default function Home() {
           {showSettings && (
             <div style={{ width: '100%', background: '#1a202c', padding: '15px', borderRadius: '8px', border: '1px solid #4a5568' }}>
               <p style={{ margin: '0 0 10px 0' }}>Modo de juego: <strong>{controlMethod === 'voz' ? 'Voz' : 'Teclado'}</strong></p>
-              {controlMethod === 'voz' && <AudioCalibrator onJump={() => {}} />}
+              <AudioCalibrator onJump={() => {}} />
             </div>
           )}
         </div>
       )}
 
-      {/* DETALLE GAME OVER */}
+      {/* PANTALLA GAME OVER */}
       {isGameOver && (
         <div style={{ textAlign: 'center', margin: '30px 0', background: '#742a2a', padding: '25px', borderRadius: '8px', border: '2px solid #e53e3e' }}>
           <h2 style={{ color: '#fff', fontSize: '2rem', marginBottom: '10px' }}>TE ALCANZO EL VACIO!</h2>
@@ -251,9 +243,9 @@ export default function Home() {
         </div>
       )}
 
-      {/* ESCENARIO ACTIVO */}
+      {/* PANEL DE JUEGO ACTIVO */}
       {isPlaying && (
-        <div>
+        <div style={{ position: 'relative' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '15px' }}>
             <button onClick={() => setIsPaused(!isPaused)} style={{ flex: 1, padding: '10px', background: isPaused ? '#3182ce' : '#dd6b20', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
               {isPaused ? 'Reanudar' : 'Pausar'}
@@ -267,8 +259,22 @@ export default function Home() {
             Explorador activo: <strong style={{ color: '#ecc94b' }}>{jugadorActivo}</strong>
           </div>
 
+          {/* CONTENEDOR MOVIDO A LA ZONA NEGRA LATERAL FUERA DEL JUEGO */}
           {controlMethod === 'voz' && !isPaused && (
-            <div style={{ marginBottom: '15px' }}><AudioCalibrator onJump={handleJumpTrigger} /></div>
+            <div style={{ 
+              position: 'fixed', 
+              top: '180px', 
+              left: 'calc(50% - 490px)', // Esto lo empuja automáticamente hacia la zona negra de la izquierda
+              zIndex: 100, 
+              background: '#1a202c', 
+              padding: '12px', 
+              borderRadius: '8px', 
+              border: '2px solid #2b6cb0', 
+              width: '170px',
+              boxShadow: '0 0 15px rgba(43, 108, 176, 0.3)'
+            }}>
+              <AudioCalibrator onJump={handleJumpTrigger} />
+            </div>
           )}
 
           <div style={{ marginTop: '15px' }}>
