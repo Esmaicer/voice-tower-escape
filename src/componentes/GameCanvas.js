@@ -2,6 +2,10 @@
 'use client';
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 
+// Agrega esto arriba en las declaraciones de variables de tu archivo
+const imgPortalCompletado = new Image();
+imgPortalCompletado.src = '/imagenes/portal-completado.jpg'; // Asegúrate de usar este nombre exacto si renombraste el archivo
+
 const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
   const canvasRef = useRef(null);
   
@@ -212,24 +216,27 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
               if (state.nivelActual < 3) {
                 state.nivelActual += 1;
                 state.camaraY = 0;
-                
-                ctx.fillStyle = '#1a202c';
+
+                ctx.drawImage(imgPortalCompletado, 0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+
                 ctx.fillStyle = '#ecc94b';
                 ctx.font = 'bold 28px "Courier New", monospace';
                 ctx.textAlign = 'center';
                 ctx.fillText(`¡PORTAL COMPLETADO! ESCENARIO ${state.nivelActual}`, canvas.width / 2, canvas.height / 2);
-                
+
                 setTimeout(() => {
                   generarPlataformasDelNivel();
                   loopId = requestAnimationFrame(gameLoop);
-                }, 1200);
-              } else {
-                onGameOver(4); 
-              }
-              return;
-            }
-
+                  }, 1200);
+                  } else {
+                    onGameOver(4);
+                  }
+                  return;
+                }
+              
+  
             const distanciaCaida = p.y - state.puntoMasAltoAlcanzadoY;
             if (distanciaCaida >= state.caidaCriticaDistancia && !state.inmune) {
               state.vidas -= 1;
