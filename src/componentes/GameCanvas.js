@@ -11,7 +11,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
   
   // ESTADO FÍSICO INTEGRADO DEL JUEGO
   const gameState = useRef({
-    personaje: { x: 380, y: 400, vx: 0, vy: 0, size: 20, enSuelo: false },
+    // Adaptamos el tamaño (size: 40) para que el sprite se aprecie detallado y encaje en las plataformas
+    personaje: { x: 380, y: 400, vx: 0, vy: 0, size: 40, enSuelo: false },
     plataformas: [],
     camaraY: 0,
     gravedad: 0.32,
@@ -20,7 +21,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     
     // SISTEMA DE NIVELES (3 NIVELES EN TOTAL)
     nivelActual: 1,
-    metrosParaSiguienteNivel: 50, 
+    metrosParaSiguienteNivel: 200, 
 
     // CONTROL DEL DOBLE SALTO
     dobleSaltoDisponible: true,
@@ -29,7 +30,13 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     vidas: 5,
     puntoMasAltoAlcanzadoY: 400, 
     caidaCriticaDistancia: 200,
-    inmune: false 
+    inmune: false,
+
+    // 🔄 VARIABLES PARA ANIMACIÓN DE SPRITES
+    direccionMirada: 'derecha', // 'izquierda' o 'derecha'
+    cuadroActual: 0,
+    contadorAnimacion: 0,
+    ticksPorCuadro: 6 // Controla la velocidad con la que cambian los fotogramas
   });
 
   // DISPARADOR DE SALTO COMPATIBLE CON DOBLE SALTO
@@ -64,12 +71,19 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
 
     const fondosNiveles = {
       1: '/imagenes/fondo-torre.png',
-      2: '/imagenes/fondo-torre2.png',
-      3: '/imagenes/fondo-torre3.png'
+      2: '/imagenes/fondo-nivel2.png',
+      3: '/imagenes/fondo-nivel3.png'
     };
 
     const imagenFondo = new Image();
     imagenFondo.src = fondosNiveles[gameState.current.nivelActual];
+
+    // ⚔️ CARGA DE SPRITES DE PISKEL
+    const spriteCorrer = new Image();
+    spriteCorrer.src = '/imagenes/Caballero.png';
+
+    const spriteSalto = new Image();
+    spriteSalto.src = '/imagenes/Salto1.png';
 
     const teclasPresionadas = {};
     
@@ -89,8 +103,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       const p = state.personaje;
       if (teclasPresionadas['ArrowLeft']) {
         p.vx = -state.velocidadCubo;
+        state.direccionMirada = 'izquierda';
       } else if (teclasPresionadas['ArrowRight']) {
         p.vx = state.velocidadCubo;
+        state.direccionMirada = 'derecha';
       } else {
         p.vx = 0;
       }
@@ -169,6 +185,16 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
 
       if (p.vy < 0 && p.y < state.puntoMasAltoAlcanzadoY) {
         state.puntoMasAltoAlcanzadoY = p.y;
+      }
+
+      // 🔄 GESTIÓN INTERNA DE ANIMACIÓN
+      state.contadorAnimacion++;
+      if (state.contadorAnimacion >= state.ticksPorCuadro) {
+        state.contadorAnimacion = 0;
+        
+        // Si está en el aire usa la tira de salto (6 cuadros), si está en el suelo usa correr (4 cuadros)
+        const totalCuadros = p.enSuelo ? 4 : 6;
+        state.cuadroActual = (state.cuadroActual + 1) % totalCuadros;
       }
 
       // ==========================================
@@ -292,8 +318,51 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         }
       }
 
-      ctx.fillStyle = state.inmune && Math.floor(Date.now() / 100) % 2 === 0 ? '#e53e3e' : '#ecc94b'; 
-      ctx.fillRect(p.x, p.y, p.size, p.size);
+      // ⚔️ RENDERIZADO AVANZADO DEL SPRITE (CABALLERO)
+      ctx.save();
+
+      // Parpadeo rojo si es inmune por daño de caída
+      if (state.inmune && Math.floor(Date.now() / 100) % 2 === 0) {
+        ctx.globalAlpha = 0.5;
+      }
+
+      // Decidir cuál spritesheet usar y calcular el tamaño del cuadro original
+      const usarSpriteSalto = !p.enSuelo;
+      const imagenActiva = usarSpriteSalto ? spriteSalto : spriteCorrer;
+      const totalCuadrosNativos = usarSpriteSalto ? 6 : 4;
+      
+      if (imagenActiva.complete && imagenActiva.naturalWidth > 0) {
+        // Calculamos el ancho exacto de un solo cuadro recortado en la tira de imágenes
+        const anchoCuadroNativo = imagenActiva.naturalWidth / totalCuadrosNativos;
+        const altoCuadroNativo = imagenActiva.naturalHeight;
+
+        // Asegurar que el fotograma actual no desborde las dimensiones calculadas
+        const cuadroCalculado = state.cuadroActual % totalCuadrosNativos;
+
+        // Lógica de espejo si mira a la izquierda
+        if (state.direccionMirada === 'izquierda') {
+          ctx.translate(p.x + p.size, p.y);
+          ctx.scale(-1, 1);
+          ctx.drawImage(
+            imagenActiva,
+            cuadroCalculado * anchoCuadroNativo, 0, anchoCuadroNativo, altoCuadroNativo, // Recorte de la tira
+            0, 0, p.size, p.size // Dibujo en escala del juego
+          );
+        } else {
+          // Dibujo normal mirando a la derecha
+          ctx.drawImage(
+            imagenActiva,
+            cuadroCalculado * anchoCuadroNativo, 0, anchoCuadroNativo, altoCuadroNativo,
+            p.x, p.y, p.size, p.size
+          );
+        }
+      } else {
+        // Cuadro de respaldo simple por si los sprites fallan en cargar en un instante dado
+        ctx.fillStyle = '#ecc94b';
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+      }
+
+      ctx.restore();
 
       // MARCADORES CENTRADOS BASADOS EN ESCENARIOS (X: 80)
       ctx.fillStyle = '#63b3ed';
