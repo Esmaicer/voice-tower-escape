@@ -17,7 +17,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     
     // SISTEMA DE NIVELES (3 NIVELES EN TOTAL)
     nivelActual: 1,
-    metrosParaSiguienteNivel: 200, 
+    metrosParaSiguienteNivel: 50, 
 
     // CONTROL DEL DOBLE SALTO
     dobleSaltoDisponible: true,
@@ -67,8 +67,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
 
     const fondosNiveles = {
       1: '/imagenes/fondo-torre.png',
-      2: '/imagenes/fondo-nivel2.png',
-      3: '/imagenes/fondo-nivel3.png'
+      2: '/imagenes/fondo-torre2.png',
+      3: '/imagenes/fondo-torre3.png'
     };
 
     const imagenFondo = new Image();
