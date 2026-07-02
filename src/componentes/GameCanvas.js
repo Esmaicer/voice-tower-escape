@@ -8,6 +8,10 @@ imgPortalCompletado.src = '/imagenes/portal-completado.jpg'; // Asegúrate de us
 
 const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
   const canvasRef = useRef(null);
+
+  // 🔊 MÚSICA DE FONDO: una pista por nivel + referencia a la que suena ahora
+  const musicaPistasRef = useRef({});
+  const musicaActualRef = useRef(null);
   
   // ESTADO FÍSICO INTEGRADO DEL JUEGO
   const gameState = useRef({
@@ -38,6 +42,53 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     contadorAnimacion: 0,
     ticksPorCuadro: 6 // Controla la velocidad con la que cambian los fotogramas
   });
+
+  // 🔊 CARGA DE MÚSICA: se crea UNA sola vez al montar el componente (no se repite al pausar)
+  useEffect(() => {
+    musicaPistasRef.current = {
+      1: new Audio('../../public/sonido/musica-nivel1.mp3'),
+      2: new Audio('../../public/sonido/musica-nivel2.mp3'),
+      3: new Audio('../../public/sonido/musica-nivel3.mp3'),
+    };
+    Object.values(musicaPistasRef.current).forEach((pista) => {
+      pista.loop = true;
+      pista.volume = 0.35;
+    });
+
+    // Limpieza: detiene y libera las pistas cuando el componente se desmonta
+    return () => {
+      Object.values(musicaPistasRef.current).forEach((pista) => {
+        pista.pause();
+        pista.src = '';
+      });
+    };
+  }, []);
+
+  // 🔊 Cambia la pista activa cuando cambia el nivel (usado al cruzar el portal y al iniciar)
+  const cambiarMusicaDeFondo = (nivel) => {
+    const nuevaPista = musicaPistasRef.current[nivel];
+    if (!nuevaPista || musicaActualRef.current === nuevaPista) return;
+
+    if (musicaActualRef.current) {
+      musicaActualRef.current.pause();
+      musicaActualRef.current.currentTime = 0;
+    }
+    musicaActualRef.current = nuevaPista;
+    if (!isPaused) {
+      nuevaPista.play().catch(() => {}); // ignora bloqueo de autoplay del navegador
+    }
+  };
+
+  // 🔊 Pausa/reanuda la música cuando el jugador pausa el juego
+  useEffect(() => {
+    const pista = musicaActualRef.current;
+    if (!pista) return;
+    if (isPaused) {
+      pista.pause();
+    } else {
+      pista.play().catch(() => {});
+    }
+  }, [isPaused]);
 
   // DISPARADOR DE SALTO COMPATIBLE CON DOBLE SALTO
   useImperativeHandle(ref, () => ({
@@ -216,6 +267,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
               if (state.nivelActual < 3) {
                 state.nivelActual += 1;
                 state.camaraY = 0;
+                cambiarMusicaDeFondo(state.nivelActual);
 
                 ctx.drawImage(imgPortalCompletado, 0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
@@ -231,6 +283,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
                   loopId = requestAnimationFrame(gameLoop);
                   }, 1200);
                   } else {
+                    if (musicaActualRef.current) musicaActualRef.current.pause();
                     onGameOver(4);
                   }
                   return;
@@ -279,6 +332,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       // ==========================================
       if (state.vidas <= 0 || (state.plataformas[0] && state.plataformas[0].y < p.y)) {
         cancelAnimationFrame(loopId);
+        if (musicaActualRef.current) musicaActualRef.current.pause();
         onGameOver(state.nivelActual); 
         return;
       }
@@ -381,6 +435,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     };
 
     loopId = requestAnimationFrame(gameLoop);
+    cambiarMusicaDeFondo(gameState.current.nivelActual);
 
     return () => {
       cancelAnimationFrame(loopId);
