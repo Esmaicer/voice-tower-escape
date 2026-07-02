@@ -2,12 +2,14 @@
 'use client';
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 
-// Agrega esto arriba en las declaraciones de variables de tu archivo
 const imgPortalCompletado = new Image();
-imgPortalCompletado.src = '/imagenes/portal-completado.jpg'; // Asegúrate de usar este nombre exacto si renombraste el archivo
+imgPortalCompletado.src = '/imagenes/portal-completado.jpg';
 
 const imgPlataformas = new Image();
 imgPlataformas.src = '/imagenes/Escalones1.png';
+
+const imgPortalVerde = new Image();
+imgPortalVerde.src = '/imagenes/portal-vortex.png';
 
 const spritePlataformaBase = { x: 0, y: 0, width: 300, height: 80 };
 
@@ -305,15 +307,26 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       for (let plat of state.plataformas) {
         if (plat.y >= -40 && plat.y <= canvas.height + 40) {
           if (plat.esPortal) {
+            if (imgPortalVerde.complete && imgPortalVerde.naturalWidth > 0) {
 
-            ctx.fillStyle = '#3182ce';
-            ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-            ctx.strokeStyle = '#63b3ed';
-            ctx.fillRect(plat.x + 5, plat.y - 12, plat.width - 10, 12);
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 10px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText("PORTAL", plat.x + plat.width / 2, plat.y + 11);
+              const anchoPortal = 115;
+              const altoPortal = 105;
+
+              const portalX = plat.x + (plat.width / 2) - (anchoPortal / 2);
+              const portalY = plat.y + plat.height - altoPortal;
+
+              ctx.drawImage(
+                imgPortalVerde,
+                portalX,
+                portalY,
+                anchoPortal,
+                altoPortal
+              )
+            } else {
+              ctx.fillStyle = '#22c55e';
+              ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+            }
+
           } else {
 
             if (plat.width > 500) {
