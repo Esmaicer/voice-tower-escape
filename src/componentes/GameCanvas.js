@@ -6,6 +6,11 @@ import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 const imgPortalCompletado = new Image();
 imgPortalCompletado.src = '/imagenes/portal-completado.jpg'; // Asegúrate de usar este nombre exacto si renombraste el archivo
 
+const imgPlataformas = new Image();
+imgPlataformas.src = '/imagenes/Escalones1.png';
+
+const spritePlataformaBase = { x: 0, y: 0, width: 300, height: 80 };
+
 const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
   const canvasRef = useRef(null);
   
@@ -234,9 +239,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
                     onGameOver(4);
                   }
                   return;
-                }
-              
-  
+                
+            }
             const distanciaCaida = p.y - state.puntoMasAltoAlcanzadoY;
             if (distanciaCaida >= state.caidaCriticaDistancia && !state.inmune) {
               state.vidas -= 1;
@@ -301,19 +305,40 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
       for (let plat of state.plataformas) {
         if (plat.y >= -40 && plat.y <= canvas.height + 40) {
           if (plat.esPortal) {
+
             ctx.fillStyle = '#3182ce';
             ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-            ctx.fillStyle = '#63b3ed';
-            ctx.fillRect(plat.x + 5, plat.y - 12, plat.width - 10, 12); 
+            ctx.strokeStyle = '#63b3ed';
+            ctx.fillRect(plat.x + 5, plat.y - 12, plat.width - 10, 12);
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 10px monospace';
             ctx.textAlign = 'center';
             ctx.fillText("PORTAL", plat.x + plat.width / 2, plat.y + 11);
           } else {
-            ctx.fillStyle = '#4a5568';
-            ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-            ctx.fillStyle = '#48bb78';
-            ctx.fillRect(plat.x, plat.y, plat.width, 3);
+
+            if (plat.width > 500) {
+              
+              ctx.fillStyle = '#1e2530';
+              ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+
+              ctx.fillStyle = '#0f141c';
+              ctx.fillRect(plat.x, plat.y, plat.width, 4);
+              
+            } else {
+              if (imgPlataformas.complete && imgPlataformas.naturalWidth > 0) {
+                const grosorVisual = 45;
+                ctx.drawImage(
+                  imgPlataformas,
+                  plat.x,
+                  plat.y - 10,
+                  plat.width,
+                  grosorVisual
+                );
+              } else {
+                ctx.fillStyle = '#4a5568';
+                ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+              }
+            }
           }
         }
       }
