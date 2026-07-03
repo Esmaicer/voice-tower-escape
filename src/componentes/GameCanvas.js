@@ -32,7 +32,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
     caidaCriticaDistancia: 200,
     inmune: false,
 
-    // 🔄 VARIABLES PARA ANIMACIÓN DE SPRITES
+    // VARIABLES PARA ANIMACIÓN DE SPRITES
     direccionMirada: 'derecha', // 'izquierda' o 'derecha'
     cuadroActual: 0,
     contadorAnimacion: 0,
@@ -187,7 +187,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused }, ref) => {
         state.puntoMasAltoAlcanzadoY = p.y;
       }
 
-      // 🔄 GESTIÓN INTERNA DE ANIMACIÓN
+      // GESTIÓN INTERNA DE ANIMACIÓN
       state.contadorAnimacion++;
       if (state.contadorAnimacion >= state.ticksPorCuadro) {
         state.contadorAnimacion = 0;
