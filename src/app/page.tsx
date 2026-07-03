@@ -52,9 +52,37 @@ export default function Home() {
     return () => window.removeEventListener('click', forzarReproduccion);
   }, [isPlaying]);
 
+  // 🌗 Baja el volumen de una pista gradualmente hasta 0 y la pausa (fundido de salida)
+  const fundidoSalidaYPausa = (audio: HTMLAudioElement, duracionMs = 600) => {
+    const pasos = 20;
+    const intervaloMs = duracionMs / pasos;
+    const volumenInicial = audio.volume;
+    let pasoActual = 0;
+    const intervalo = setInterval(() => {
+      pasoActual++;
+      audio.volume = Math.max(volumenInicial * (1 - pasoActual / pasos), 0);
+      if (pasoActual >= pasos) {
+        clearInterval(intervalo);
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = volumenInicial; // restaurar para la próxima vez que se reproduzca desde el inicio
+      }
+    }, intervaloMs);
+  };
+
   useEffect(() => {
-    if (audioTagRef.current) {
-      audioTagRef.current.volume = muteRef.current ? 0 : (isPlaying ? 0.3 : 0.6);
+    if (!audioTagRef.current) return;
+    if (isPlaying) {
+      // Se está jugando un nivel: nos aseguramos de que quede pausada
+      // (el fundido de salida ya la lleva a 0 y la pausa desde handleIniciarJuego)
+      audioTagRef.current.pause();
+    } else {
+      // Volvemos al menú o llegamos a Game Over: SIEMPRE desde el inicio, no reanudar donde quedó
+      audioTagRef.current.currentTime = 0;
+      audioTagRef.current.volume = muteRef.current ? 0 : 0.6;
+      if (!muteRef.current) {
+        audioTagRef.current.play().catch(() => {});
+      }
     }
   }, [isPlaying]);
 
@@ -72,14 +100,29 @@ export default function Home() {
   const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    const nuevoEstadoMute = !muteRef.current;
+    muteRef.current = nuevoEstadoMute;
+
+    // Música de portada (menú / pantalla de Game Over)
     if (audioTagRef.current) {
-      const estadoMuteActual = !audioTagRef.current.muted;
-      audioTagRef.current.muted = estadoMuteActual;
-      muteRef.current = estadoMuteActual;
-      audioTagRef.current.volume = estadoMuteActual ? 0 : (isPlaying ? 0.3 : 0.6);
-      if (botonMuteRef.current) {
-        botonMuteRef.current.innerText = estadoMuteActual ? 'Muted' : 'Audio';
+      audioTagRef.current.muted = nuevoEstadoMute;
+      if (!isPlaying) {
+        audioTagRef.current.volume = nuevoEstadoMute ? 0 : 0.6;
+        if (nuevoEstadoMute) {
+          audioTagRef.current.pause();
+        } else {
+          audioTagRef.current.play().catch(() => {});
+        }
       }
+    }
+
+    // Música de nivel + efectos de sonido del personaje (si se está jugando)
+    if (gameCanvasRef.current) {
+      gameCanvasRef.current.setMuted(nuevoEstadoMute);
+    }
+
+    if (botonMuteRef.current) {
+      botonMuteRef.current.innerText = nuevoEstadoMute ? 'Muted' : 'Audio';
     }
   };
 
@@ -115,6 +158,19 @@ export default function Home() {
     }
     setIsPlaying(false);
     setIsGameOver(true);
+    setIsPaused(false);
+  };
+
+  // INICIA (O REINICIA) EL JUEGO: funde la música de portada mientras arranca la del nivel 1
+  const handleIniciarJuego = () => {
+    if (audioTagRef.current && !muteRef.current && !audioTagRef.current.paused) {
+      fundidoSalidaYPausa(audioTagRef.current, 600);
+    } else if (audioTagRef.current) {
+      audioTagRef.current.pause();
+      audioTagRef.current.currentTime = 0;
+    }
+    setIsGameOver(false);
+    setIsPlaying(true);
     setIsPaused(false);
   };
 
@@ -172,7 +228,7 @@ export default function Home() {
             <button onClick={() => setControlMethod('teclado')} style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: controlMethod === 'teclado' ? '#ecc94b' : '#4a5568', color: controlMethod === 'teclado' ? '#000' : '#fff' }}>Teclado</button>
           </div>
 
-          <button style={{ padding: '15px 40px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', background: '#38a169', color: 'white', border: 'none', borderRadius: '6px', boxShadow: '0 5px #22543d' }} onClick={() => { setIsPlaying(true); setIsPaused(false); }}>¡INICIAR JUEGO!</button>
+          <button style={{ padding: '15px 40px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', background: '#38a169', color: 'white', border: 'none', borderRadius: '6px', boxShadow: '0 5px #22543d' }} onClick={handleIniciarJuego}>¡INICIAR JUEGO!</button>
           <button style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px' }} onClick={() => setShowSettings(!showSettings)}>{showSettings ? 'Ocultar Ajustes' : 'Configurar Dispositivo'}</button>
 
           {showSettings && (
@@ -199,7 +255,7 @@ export default function Home() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-            <button style={{ padding: '12px 25px', fontSize: '16px', cursor: 'pointer', background: '#ecc94b', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '6px' }} onClick={() => { setIsGameOver(false); setIsPlaying(true); }}>Reintentar</button>
+            <button style={{ padding: '12px 25px', fontSize: '16px', cursor: 'pointer', background: '#ecc94b', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '6px' }} onClick={handleIniciarJuego}>Reintentar</button>
             <button style={{ padding: '12px 25px', fontSize: '16px', cursor: 'pointer', background: '#4a5568', color: '#fff', border: 'none', borderRadius: '6px' }} onClick={() => setIsGameOver(false)}>Menú Principal</button>
           </div>
         </div>
@@ -220,7 +276,7 @@ export default function Home() {
 
           <div style={{ marginTop: '15px' }}>
             {/* @ts-ignore */}
-            <GameCanvas ref={gameCanvasRef} isPaused={isPaused} onGameOver={handleGameOver} />
+            <GameCanvas ref={gameCanvasRef} isPaused={isPaused} onGameOver={handleGameOver} initialMuted={muteRef.current} />
           </div>
         </div>
       )}
