@@ -26,6 +26,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
   const audioDobleSaltoRef = useRef(null);
   const audioDanoRef = useRef(null);
   const audioEnemigoMuerteRef = useRef(null);
+  const audioVidaRef = useRef(null); // sonido al recoger un corazón
 
   const isMutedRef = useRef(initialMuted);
   
@@ -34,6 +35,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     personaje: { x: 380, y: 400, vx: 0, vy: 0, size: 40, enSuelo: false },
     plataformas: [],
     enemigos: [], // Lista de enemigos activos
+    corazones: [], // Corazones de vida recolectables en la plataforma
     camaraY: 0,
     gravedad: 0.32,
     fuerzaSalto: -8.2,
@@ -43,6 +45,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
 
     dobleSaltoDisponible: true,
     vidas: 5,
+    vidasMaximas: 5, // tope de corazones; al llegar aquí, los corazones en el mapa desaparecen solos
     puntoMasAltoAlcanzadoY: 400, 
     caidaCriticaDistancia: 200,
     inmune: false,
@@ -101,12 +104,17 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     audioEnemigoMuerteRef.current.volume = 0.5;
     audioEnemigoMuerteRef.current.muted = isMutedRef.current;
 
+    // Sonido al recoger un corazón de vida
+    audioVidaRef.current = new Audio('/sonido/vida.mp3');
+    audioVidaRef.current.volume = 0.6;
+    audioVidaRef.current.muted = isMutedRef.current;
+
     return () => {
       Object.values(musicaPistasRef.current).forEach((pista) => {
         pista.pause();
         pista.src = '';
       });
-      [audioSaltoRef, audioDobleSaltoRef, audioDanoRef, audioEnemigoMuerteRef].forEach((refAudio) => {
+      [audioSaltoRef, audioDobleSaltoRef, audioDanoRef, audioEnemigoMuerteRef, audioVidaRef].forEach((refAudio) => {
         if (refAudio.current) {
           refAudio.current.pause();
           refAudio.current.src = '';
@@ -161,7 +169,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         musicaActualRef.current.play().catch(() => {});
       }
     }
-    [audioSaltoRef, audioDobleSaltoRef, audioDanoRef, audioEnemigoMuerteRef].forEach((refAudio) => {
+    [audioSaltoRef, audioDobleSaltoRef, audioDanoRef, audioEnemigoMuerteRef, audioVidaRef].forEach((refAudio) => {
       if (refAudio.current) refAudio.current.muted = muted;
     });
   };
@@ -276,6 +284,35 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       return enemigos;
     };
 
+    // 💗 Coloca 1 o 2 corazones de vida sobre las plataformas más difíciles de alcanzar.
+    // Esta función se llama para CUALQUIER nivel (1, 2 o 3) desde generarPlataformasDelNivel,
+    // no está condicionada a state.nivelActual, así que corre igual en los tres escenarios.
+    const generarCorazonesDelNivel = (plataformas) => {
+      // Preferimos las plataformas más angostas (más difíciles de aterrizar)
+      let candidatas = plataformas.filter(
+        (plat, idx) => !plat.esPortal && idx !== 0 && plat.width <= 90
+      );
+
+      // Respaldo: si por azar ese nivel no generó ninguna plataforma angosta,
+      // usamos cualquier plataforma normal para GARANTIZAR que siempre haya
+      // al menos un corazón en cada uno de los 3 niveles.
+      if (candidatas.length === 0) {
+        candidatas = plataformas.filter((plat, idx) => !plat.esPortal && idx !== 0);
+      }
+      if (candidatas.length === 0) return [];
+
+      const barajadas = [...candidatas].sort(() => Math.random() - 0.5);
+      // A veces 1, a veces 2 — varía aleatoriamente en cada nivel y en cada partida
+      const cantidad = Math.random() < 0.5 ? 1 : 2;
+      const seleccionadas = barajadas.slice(0, Math.min(cantidad, barajadas.length));
+
+      return seleccionadas.map((plat) => ({
+        x: plat.x + plat.width / 2 - 10,
+        y: plat.y - 26,
+        size: 20,
+      }));
+    };
+
     const generarPlataformasDelNivel = () => {
       const state = gameState.current;
       const lista = [];
@@ -298,6 +335,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       } else {
         state.enemigos = [];
       }
+
+      state.corazones = generarCorazonesDelNivel(lista);
 
       state.personaje.x = 380;
       state.personaje.y = 400;
@@ -437,6 +476,29 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
+      // ==========================================
+      // B2. CORAZONES DE VIDA (RECOLECTABLES)
+      // ==========================================
+      if (state.corazones && state.corazones.length > 0) {
+        state.corazones = state.corazones.filter((corazon) => {
+          // Si las vidas ya están al máximo, el corazón desaparece solo (sin necesidad de tocarlo)
+          if (state.vidas >= state.vidasMaximas) return false;
+
+          const colisiona =
+            p.x + p.size > corazon.x &&
+            p.x < corazon.x + corazon.size &&
+            p.y + p.size > corazon.y &&
+            p.y < corazon.y + corazon.size;
+
+          if (colisiona) {
+            state.vidas = Math.min(state.vidas + 1, state.vidasMaximas);
+            reproducirEfecto(audioVidaRef);
+            return false; // se recoge y desaparece
+          }
+          return true; // sigue esperando en la plataforma
+        });
+      }
+
       // DAÑO Y ELIMINACIÓN DE ENEMIGOS (CORREGIDO)
       if (state.nivelActual === 3 && !state.inmune) {
         for (let ene of state.enemigos) {
@@ -497,6 +559,9 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
           ene.platLeft = ene.platLeft; // Se mantienen consistentes
           ene.platRight = ene.platRight;
         }
+        for (let cor of state.corazones) {
+          cor.y += desfase;
+        }
       } 
       else if (p.y > limiteInferior) {
         const desfase = p.y - limiteInferior;
@@ -508,6 +573,9 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
         for (let ene of state.enemigos) {
           ene.y -= desfase;
+        }
+        for (let cor of state.corazones) {
+          cor.y -= desfase;
         }
       }
 
@@ -577,6 +645,22 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
             }
           }
         }
+      }
+
+      // DIBUJAR CORAZONES DE VIDA RECOLECTABLES
+      if (state.corazones && state.corazones.length > 0) {
+        ctx.save();
+        ctx.font = '22px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let cor of state.corazones) {
+          if (cor.y >= -40 && cor.y <= canvas.height + 40) {
+            // Pequeño efecto de flotación para que destaquen sobre la plataforma
+            const flotacion = Math.sin(Date.now() / 250 + cor.x) * 3;
+            ctx.fillText('❤️', cor.x + cor.size / 2, cor.y + cor.size / 2 + flotacion);
+          }
+        }
+        ctx.restore();
       }
 
       // DIBUJAR ENEMIGOS (SLIMES VERDES)
