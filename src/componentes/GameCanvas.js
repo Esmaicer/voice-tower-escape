@@ -284,27 +284,29 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       return enemigos;
     };
 
-    // 💗 Coloca 1 o 2 corazones de vida sobre las plataformas más difíciles de alcanzar.
-    // Esta función se llama para CUALQUIER nivel (1, 2 o 3) desde generarPlataformasDelNivel,
-    // no está condicionada a state.nivelActual, así que corre igual en los tres escenarios.
+    // 💗 Coloca SIEMPRE 3 corazones de vida por nivel, sin importar si al jugador
+    // ya le sobran vidas al llegar: quedan ahí como reserva por si más adelante,
+    // en ese mismo nivel, pierde una vida y necesita recuperarla.
+    // Esta función corre para CUALQUIER nivel (1, 2 o 3) desde generarPlataformasDelNivel.
     const generarCorazonesDelNivel = (plataformas) => {
       // Preferimos las plataformas más angostas (más difíciles de aterrizar)
       let candidatas = plataformas.filter(
         (plat, idx) => !plat.esPortal && idx !== 0 && plat.width <= 90
       );
 
-      // Respaldo: si por azar ese nivel no generó ninguna plataforma angosta,
-      // usamos cualquier plataforma normal para GARANTIZAR que siempre haya
-      // al menos un corazón en cada uno de los 3 niveles.
-      if (candidatas.length === 0) {
-        candidatas = plataformas.filter((plat, idx) => !plat.esPortal && idx !== 0);
+      // Si no hay 3 plataformas angostas disponibles, completamos con cualquier
+      // otra plataforma normal para llegar a los 3 corazones siempre que se pueda.
+      if (candidatas.length < 3) {
+        const resto = plataformas.filter(
+          (plat, idx) => !plat.esPortal && idx !== 0 && plat.width > 90
+        );
+        candidatas = [...candidatas, ...resto];
       }
       if (candidatas.length === 0) return [];
 
       const barajadas = [...candidatas].sort(() => Math.random() - 0.5);
-      // A veces 1, a veces 2 — varía aleatoriamente en cada nivel y en cada partida
-      const cantidad = Math.random() < 0.5 ? 1 : 2;
-      const seleccionadas = barajadas.slice(0, Math.min(cantidad, barajadas.length));
+      const cantidad = Math.min(3, barajadas.length);
+      const seleccionadas = barajadas.slice(0, cantidad);
 
       return seleccionadas.map((plat) => ({
         x: plat.x + plat.width / 2 - 10,
@@ -481,21 +483,21 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       // ==========================================
       if (state.corazones && state.corazones.length > 0) {
         state.corazones = state.corazones.filter((corazon) => {
-          // Si las vidas ya están al máximo, el corazón desaparece solo (sin necesidad de tocarlo)
-          if (state.vidas >= state.vidasMaximas) return false;
-
           const colisiona =
             p.x + p.size > corazon.x &&
             p.x < corazon.x + corazon.size &&
             p.y + p.size > corazon.y &&
             p.y < corazon.y + corazon.size;
 
-          if (colisiona) {
+          // Solo se recoge (y desaparece) si el jugador realmente tiene una vida faltante.
+          // Si ya tiene las vidas completas, el corazón se queda en la plataforma tal cual,
+          // por si más adelante en este mismo nivel pierde una vida y necesita recuperarla.
+          if (colisiona && state.vidas < state.vidasMaximas) {
             state.vidas = Math.min(state.vidas + 1, state.vidasMaximas);
             reproducirEfecto(audioVidaRef);
             return false; // se recoge y desaparece
           }
-          return true; // sigue esperando en la plataforma
+          return true; // se mantiene en la plataforma
         });
       }
 
