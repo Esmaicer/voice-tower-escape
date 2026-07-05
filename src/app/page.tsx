@@ -150,16 +150,22 @@ export default function Home() {
   }, [isPaused]);
 
   // RECIBE EL NIVEL ALCANZADO DESDE EL CANVAS AL MORIR O GANAR
-  const handleGameOver = (nivelAlcanzado: number) => {
+  // Envuelta en useCallback: si no lo estuviera, GameCanvas recibiría una función
+  // "nueva" en cada render de Home, obligando a su efecto pesado (game loop, listeners,
+  // carga de imágenes) a destruirse y reconstruirse innecesariamente en cada render.
+  const handleGameOver = useCallback((nivelAlcanzado: number) => {
     setCurrentScore(nivelAlcanzado); 
-    if (nivelAlcanzado > highScore) {
-      setHighScore(nivelAlcanzado);
-      localStorage.setItem(`vt_maxlevel_${jugadorActivo}_${controlMethod}`, nivelAlcanzado.toString());
-    }
+    setHighScore((anterior) => {
+      if (nivelAlcanzado > anterior) {
+        localStorage.setItem(`vt_maxlevel_${jugadorActivo}_${controlMethod}`, nivelAlcanzado.toString());
+        return nivelAlcanzado;
+      }
+      return anterior;
+    });
     setIsPlaying(false);
     setIsGameOver(true);
     setIsPaused(false);
-  };
+  }, [jugadorActivo, controlMethod]);
 
   // INICIA (O REINICIA) EL JUEGO: funde la música de portada mientras arranca la del nivel 1
   const handleIniciarJuego = () => {
@@ -263,20 +269,67 @@ export default function Home() {
 
       {isPlaying && (
         <div style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '15px' }}>
-            <button onClick={() => setIsPaused(!isPaused)} style={{ flex: 1, padding: '10px', background: isPaused ? '#3182ce' : '#dd6b20', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>{isPaused ? 'Reanudar' : 'Pausar'}</button>
-            <button onClick={() => { setIsPlaying(false); setIsPaused(false); }} style={{ flex: 1, padding: '10px', background: '#e53e3e', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>Salir al Menú</button>
-          </div>
-
+          {!isPaused && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '15px' }}>
+              <button onClick={() => setIsPaused(!isPaused)} style={{ flex: 1, padding: '10px', background: '#dd6b20', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>Pausar</button>
+              <button onClick={() => { setIsPlaying(false); setIsPaused(false); }} style={{ flex: 1, padding: '10px', background: '#e53e3e', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>Salir al Menú</button>
+            </div>
+          )}
           {controlMethod === 'voz' && !isPaused && (
             <div style={{ position: 'fixed', top: '180px', left: 'calc(50% - 580px)', zIndex: 100, background: '#1a202c', padding: '12px', borderRadius: '8px', border: '2px solid #2b6cb0', width: '170px' }}>
               <AudioCalibrator onJump={handleJumpTrigger} />
             </div>
           )}
 
-          <div style={{ marginTop: '15px' }}>
+          <div style={{ marginTop: '15px', position: 'relative', width: '760px', maxWidth: '100%', margin: '15px auto 0' }}>
             {/* @ts-ignore */}
             <GameCanvas ref={gameCanvasRef} isPaused={isPaused} onGameOver={handleGameOver} initialMuted={muteRef.current} />
+
+            {isPaused && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  background: 'rgba(10, 15, 25, 0.55)', // semitransparente: el personaje pausado se ve de fondo
+                  backdropFilter: 'blur(2px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '8px',
+                  zIndex: 50,
+                }}
+              >
+                <div
+                  style={{
+                    background: 'rgba(26, 32, 44, 0.85)',
+                    border: '2px solid #2b6cb0',
+                    borderRadius: '10px',
+                    padding: '25px 35px',
+                    textAlign: 'center',
+                    boxShadow: '0 8px 25px rgba(0,0,0,0.5)',
+                    minWidth: '240px',
+                  }}
+                >
+                  <h2 style={{ color: '#ecc94b', margin: '0 0 20px 0', fontSize: '1.5rem', textShadow: '2px 2px #000' }}>
+                    JUEGO EN PAUSA
+                  </h2>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <button
+                      onClick={() => setIsPaused(false)}
+                      style={{ padding: '12px 20px', background: '#3182ce', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
+                    >
+                      Reanudar
+                    </button>
+                    <button
+                      onClick={() => { setIsPlaying(false); setIsPaused(false); }}
+                      style={{ padding: '12px 20px', background: '#e53e3e', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
+                    >
+                      Salir al Menú
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -32,6 +32,16 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
   const audioVidaRef = useRef(null); // sonido al recoger un corazón
 
   const isMutedRef = useRef(initialMuted);
+
+  // ⚙️ OPTIMIZACIÓN: isPaused y onGameOver como refs, sincronizados en cada render.
+  // Así el efecto pesado (game loop, listeners, carga de imágenes) puede montarse
+  // UNA sola vez (deps: []) y leer siempre el valor más reciente sin necesitar
+  // destruirse y reconstruirse cada vez que estos props cambian de identidad o valor.
+  const isPausedRef = useRef(isPaused);
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+
+  const onGameOverRef = useRef(onGameOver);
+  useEffect(() => { onGameOverRef.current = onGameOver; }, [onGameOver]);
   
   // ESTADO FÍSICO INTEGRADO DEL JUEGO
   const gameState = useRef({
@@ -159,7 +169,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       musicaActualRef.current.currentTime = 0;
     }
     musicaActualRef.current = nuevaPista;
-    if (!isPaused && !isMutedRef.current) {
+    if (!isPausedRef.current && !isMutedRef.current) {
       nuevaPista.currentTime = 0;
       fundidoEntrada(nuevaPista, 0.35, 700);
       nuevaPista.play().catch(() => {});
@@ -172,7 +182,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       musicaActualRef.current.muted = muted;
       if (muted) {
         musicaActualRef.current.pause();
-      } else if (!isPaused) {
+      } else if (!isPausedRef.current) {
         musicaActualRef.current.play().catch(() => {});
       }
     }
@@ -222,6 +232,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let loopId;
+    let timeoutTransicionNivelId = null;
 
     const fondosNiveles = {
       1: '/imagenes/fondo-torre.png',
@@ -241,7 +252,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     const teclasPresionadas = {};
     
     const manejarKeyDown = (e) => {
-      if (isPaused) return;
+      if (isPausedRef.current) return;
       teclasPresionadas[e.code] = true;
       actualizarVelocidadHorizontal();
     };
@@ -382,15 +393,13 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         state.enemigos = [];
       }
 
-      if (state.nivelActual === 2) {
+      if (state.nivelActual === 2 || state.nivelActual === 3) {
         state.sierras = generarSierrasDelNivel2();
       } else {
         state.sierras = [];
       }
 
       state.corazones = generarCorazonesDelNivel(lista);
-
-      state.sierras = generarSierrasDelNivel2();
 
       state.personaje.x = 380;
       state.personaje.y = 400;
@@ -408,13 +417,11 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       const state = gameState.current;
       const p = state.personaje;
 
-      if (isPaused) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 24px "Courier New", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText("JUEGO EN PAUSA", canvas.width / 2, canvas.height / 2);
+      if (isPausedRef.current) {
+        // Ya no se dibuja nada aquí: el modal de pausa ahora es un overlay HTML real
+        // en page.tsx (semitransparente, con los botones de Reanudar/Salir). Al no
+        // tocar el canvas, el último fotograma queda "congelado" tal cual se ve
+        // detrás del modal, mostrando al personaje pausado de fondo.
         loopId = requestAnimationFrame(gameLoop);
         return;
       }
@@ -462,8 +469,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      // Rotacion de SIERRAS (nivel 2)
-      if (state.nivelActual === 2) {
+      // Rotacion de SIERRAS (nivel 2 y 3)
+      if (state.nivelActual === 2 || state.nivelActual === 3) {
         for (let sierra of state.sierras) {
           sierra.angulo += 0.004;
           if (sierra.angulo >= 2 * Math.PI) sierra.angulo -= 2 * Math.PI;
@@ -499,8 +506,9 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
                 state.camaraY = 0;
                 cambiarMusicaDeFondo(state.nivelActual);
 
-                if (imgPortalCompletadoRef.current) {
-                  ctx.drawImage(imgPortalCompletadoRef.current, 0, 0, canvas.width, canvas.height);
+                const imgPortalListo = imgPortalCompletadoRef.current;
+                if (imgPortalListo && imgPortalListo.complete && imgPortalListo.naturalWidth > 0) {
+                  ctx.drawImage(imgPortalListo, 0, 0, canvas.width, canvas.height);
                 }
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -510,13 +518,16 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
                 ctx.textAlign = 'center';
                 ctx.fillText(`¡PORTAL COMPLETADO! ESCENARIO ${state.nivelActual}`, canvas.width / 2, canvas.height / 2);
 
-                setTimeout(() => {
+                // Se guarda el ID para poder cancelarlo si el componente se desmonta
+                // o el efecto se reinicia mientras esta transición está pendiente
+                // (evita loops de juego huérfanos corriendo en paralelo).
+                timeoutTransicionNivelId = setTimeout(() => {
                   generarPlataformasDelNivel();
                   loopId = requestAnimationFrame(gameLoop);
                 }, 1200);
               } else {
                 if (musicaActualRef.current) musicaActualRef.current.pause();
-                onGameOver(4);
+                onGameOverRef.current(4);
               }
               return;
             }
@@ -664,7 +675,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       if (state.vidas <= 0 || (state.plataformas[0] && state.plataformas[0].y < p.y)) {
         cancelAnimationFrame(loopId);
         if (musicaActualRef.current) musicaActualRef.current.pause();
-        onGameOver(state.nivelActual); 
+        onGameOverRef.current(state.nivelActual); 
         return;
       }
 
@@ -731,8 +742,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         ctx.restore();
       }
 
-      // DIBUJAR ENEMIGOS (SLIMES VERDES)
-      if (state.nivelActual === 2 && !state.inmune) {
+      // COLISIÓN CON SIERRAS (nivel 2 y 3)
+      if ((state.nivelActual === 2 || state.nivelActual === 3) && !state.inmune) {
         for (let sierra of state.sierras) {
 
           if (
@@ -792,12 +803,12 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      if (state.nivelActual === 2) {
+      if (state.nivelActual === 2 || state.nivelActual === 3) {
         const img = imgSierraRef.current;
 
         for (let sierra of state.sierras) {
 
-          if (img && img.complete) {
+          if (img && img.complete && img.naturalWidth > 0) {
 
             ctx.save();
 
@@ -865,10 +876,17 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
 
     return () => {
       cancelAnimationFrame(loopId);
+      // Evita el bug de "loops huérfanos": si el efecto se desmonta/reinicia
+      // mientras la transición de portal está pendiente, cancelamos ese timeout
+      // en vez de dejar que dispare más tarde y arranque un segundo gameLoop.
+      if (timeoutTransicionNivelId) clearTimeout(timeoutTransicionNivelId);
       window.removeEventListener('keydown', manejarKeyDown);
       window.removeEventListener('keyup', manejarKeyUp);
     };
-  }, [onGameOver, isPaused]);
+    // ⚙️ OPTIMIZACIÓN: deps: [] — este efecto (game loop, imágenes, listeners) se
+    // monta UNA sola vez. isPaused y onGameOver ya no son necesarios aquí porque
+    // el loop los lee siempre actualizados vía isPausedRef/onGameOverRef.
+  }, []);
 
   return (
     <canvas ref={canvasRef} width={760} height={600} style={{ display: 'block', margin: '0 auto', background: '#1a202c', borderRadius: '8px', border: '2px solid #4a5568' }} />
