@@ -7,9 +7,10 @@ import AudioCalibrator from '@/componentes/AudioCalibrator';
 export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
+  const [isVictory, setIsVictory] = useState(false); // 🏆 Nuevo estado independiente para la ventana de victoria
   const [isPaused, setIsPaused] = useState(false); 
   const [showSettings, setShowSettings] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(false); // Estado para colapsar instrucciones
+  const [showInstructions, setShowInstructions] = useState(false); 
   const [controlMethod, setControlMethod] = useState<'voz' | 'teclado'>('teclado'); 
   
   const [jugadores, setJugadores] = useState<string[]>(['Invitado']);
@@ -52,7 +53,7 @@ export default function Home() {
     return () => window.removeEventListener('click', forzarReproduccion);
   }, [isPlaying]);
 
-  // Baja el volumen de una pista gradualmente hasta 0 y la pausa (fundido de salida)
+  // Baja el volumen de una pista gradualmente hasta 0 y la pausa
   const fundidoSalidaYPausa = (audio: HTMLAudioElement, duracionMs = 600) => {
     const pasos = 20;
     const intervaloMs = duracionMs / pasos;
@@ -83,7 +84,7 @@ export default function Home() {
     }
   }, [isPlaying]);
 
-  // CARGAR EL RÉCORD DE NIVEL SEGÚN EL USUARIO Y PERIFÉRICO
+  // CARGAR EL RÉCORD DE NIVEL SEGÚN EL JUGADOR Y PERIFÉRICO
   useEffect(() => {
     const recordEspecifico = localStorage.getItem(`vt_maxlevel_${jugadorActivo}_${controlMethod}`);
     if (recordEspecifico) {
@@ -144,6 +145,7 @@ export default function Home() {
     }
   }, [isPaused]);
 
+  // MANEJA LA SEPARACIÓN DE PANTALLAS EN BASE AL RESULTADO ENVIADO POR EL CANVAS
   const handleGameOver = useCallback((nivelAlcanzado: number) => {
     setCurrentScore(nivelAlcanzado); 
     setHighScore((anterior) => {
@@ -153,12 +155,21 @@ export default function Home() {
       }
       return anterior;
     });
+
     setIsPlaying(false);
-    setIsGameOver(true);
     setIsPaused(false);
+
+    if (nivelAlcanzado === 5) {
+      // Si el valor es 5 significa que se superaron los 4 niveles completos
+      setIsVictory(true);
+      setIsGameOver(false);
+    } else {
+      // Cualquier otro valor significa derrota normal en el intento
+      setIsGameOver(true);
+      setIsVictory(false);
+    }
   }, [jugadorActivo, controlMethod]);
 
-  // 🛠️ FUNCIÓN COMPLETAMENTE DECLARADA Y REESTABLECIDA
   const handleIniciarJuego = () => {
     if (audioTagRef.current && !muteRef.current && !audioTagRef.current.paused) {
       fundidoSalidaYPausa(audioTagRef.current, 600);
@@ -167,6 +178,7 @@ export default function Home() {
       audioTagRef.current.currentTime = 0;
     }
     setIsGameOver(false);
+    setIsVictory(false); // Resetea la ventana de victoria
     setIsPlaying(true);
     setIsPaused(false);
   };
@@ -198,7 +210,8 @@ export default function Home() {
 
       <h1 style={{ textAlign: 'center', color: '#ecc94b', fontSize: '2.5rem', textShadow: '3px 3px #c05621', marginBottom: '10px' }}>VOICE TOWER ESCAPE</h1>
       
-      {!isPlaying && !isGameOver && (
+      {/* MENU PRINCIPAL */}
+      {!isPlaying && !isGameOver && !isVictory && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', margin: '30px 0' }}>
           
           <div style={{ background: '#1a202c', width: '100%', padding: '15px', borderRadius: '8px', border: '1px solid #4a5568', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -216,7 +229,7 @@ export default function Home() {
           </div>
 
           <div style={{ background: '#2d3748', padding: '12px 25px', borderRadius: '8px', border: '2px dashed #ecc94b', fontSize: '1.1rem', color: '#ecc94b', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
-            MÁXIMO ESCENARIO DE <strong>{jugadorActivo.toUpperCase()}</strong> ({controlMethod.toUpperCase()}): {highScore === 4 ? '¡TORRE COMPLETADA!' : `NIVEL ${highScore}`}
+            MÁXIMO ESCENARIO DE <strong>{jugadorActivo.toUpperCase()}</strong> ({controlMethod.toUpperCase()}): {highScore === 5 ? '¡TORRE COMPLETADA! 🏆' : `NIVEL ${highScore}`}
           </div>
 
           <div style={{ display: 'flex', gap: '10px', background: '#2d3748', padding: '8px', borderRadius: '8px' }}>
@@ -224,7 +237,6 @@ export default function Home() {
             <button onClick={() => setControlMethod('teclado')} style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: controlMethod === 'teclado' ? '#ecc94b' : '#4a5568', color: controlMethod === 'teclado' ? '#000' : '#fff' }}>Teclado</button>
           </div>
 
-          {/* BOTÓN PARA DESPLEGAR/OCULTAR INSTRUCCIONES */}
           <button 
             style={{ padding: '12px 20px', fontSize: '16px', cursor: 'pointer', background: '#2b6cb0', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', width: '100%', maxWidth: '340px' }} 
             onClick={() => setShowInstructions(!showInstructions)}
@@ -232,7 +244,6 @@ export default function Home() {
             {showInstructions ? 'Ocultar Instrucciones' : 'Ver Instrucciones de Juego'}
           </button>
 
-          {/* RENDERING CONDICIONAL DE LAS INSTRUCCIONES */}
           {showInstructions && (
             <div style={{ background: '#1a202c', width: '100%', padding: '20px', borderRadius: '8px', border: '2px solid #2b6cb0', boxSizing: 'border-box' }}>
               <h3 style={{ margin: '0 0 12px 0', color: '#ecc94b', fontSize: '1.1rem', textAlign: 'center', textDecoration: 'underline' }}>INSTRUCCIONES DE SUPERVIVENCIA</h3>
@@ -257,7 +268,7 @@ export default function Home() {
                   <ul style={{ margin: '0', paddingLeft: '20px' }}>
                     <li><strong>Caída Crítica:</strong> Si caes al vacío o desciendes demasiada distancia de golpe, perderás un ❤️.</li>
                     <li><strong>El Vacío Ascendente:</strong> No te quedes abajo; si la primera plataforma te pasa por arriba, es muerte instantánea.</li>
-                    <li><strong> Slimes (Nivel 3):</strong> Te dañan de lado. <strong>¡Sáltales en la cabeza</strong> para destruirlos y rebotar!</li>
+                    <li><strong> Slimes e Sierras (Nivel 4):</strong> Obstáculos combinados. ¡Pisa a los slimes para destruirlos o evita las afiladas aspas!</li>
                     <li><strong> Portales:</strong> Llega a la parte más alta de cada nivel para teletransportarte al siguiente escenario.</li>
                   </ul>
                 </div>
@@ -277,23 +288,32 @@ export default function Home() {
         </div>
       )}
 
-      {/* PANTALLA GAME OVER */}
+      {/* VENTANA 1: PANTALLA GAME OVER (ÚNICAMENTE SI MUERE) */}
       {isGameOver && (
-        <div style={{ textAlign: 'center', margin: '30px 0', background: '#742a2a', padding: '25px', borderRadius: '8px', border: '2px solid #e53e3e' }}>
-          <h2 style={{ color: '#fff', fontSize: '2rem', marginBottom: '10px' }}>
-            {currentScore === 4 ? '¡FELICIDADES!' : 'TE ALCANZÓ EL VACÍO!'}
-          </h2>
+        <div style={{ textAlign: 'center', margin: '30px 0', background: '#742a2a', padding: '25px', borderRadius: '8px', border: '2px solid #e53e3e', boxShadow: '0 0 15px #e53e3e' }}>
+          <h2 style={{ color: '#fff', fontSize: '2rem', marginBottom: '10px', textShadow: '2px 2px #000' }}>TE ALCANZÓ EL VACÍO!</h2>
           <p style={{ color: '#fff', fontSize: '1.1rem' }}>Explorador: <strong>{jugadorActivo}</strong></p>
           <div style={{ color: '#ecc94b', fontSize: '1.2rem', marginBottom: '20px' }}>
-            {currentScore === 4 ? (
-              <span>¡Dominaste todos los escenarios!</span>
-            ) : (
-              <span>Llegaste hasta el: <strong>Nivel {currentScore}</strong></span>
-            )}
+            <span>Llegaste hasta el: <strong>Nivel {currentScore}</strong></span>
           </div>
           <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
             <button style={{ padding: '12px 25px', fontSize: '16px', cursor: 'pointer', background: '#ecc94b', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '6px' }} onClick={handleIniciarJuego}>Reintentar</button>
-            <button style={{ padding: '12px 25px', fontSize: '16px', cursor: 'pointer', background: '#4a5568', color: '#fff', border: 'none', borderRadius: '6px' }} onClick={() => setIsGameOver(false)}>Menú Principal</button>
+            <button style={{ padding: '12px 25px', fontSize: '16px', cursor: 'pointer', background: '#4a5568', color: '#fff', border: 'none', borderRadius: '6px' }} onClick={() => { setIsGameOver(false); setIsVictory(false); }}>Menú Principal</button>
+          </div>
+        </div>
+      )}
+
+      {/* VENTANA 2: PANTALLA DE VICTORIA ABSOLUTA (¡LOGRASTE SALIR!) */}
+      {isVictory && (
+        <div style={{ textAlign: 'center', margin: '30px 0', background: '#22543d', padding: '30px', borderRadius: '8px', border: '3px solid #48bb78', boxShadow: '0 0 20px #48bb78' }}>
+          <h2 style={{ color: '#ecc94b', fontSize: '2.3rem', marginBottom: '10px', textShadow: '2px 2px #000' }}>¡FELICIDADES!</h2>
+          <p style={{ color: '#fff', fontSize: '1.2rem', marginBottom: '10px' }}>Explorador legendario: <strong>{jugadorActivo.toUpperCase()}</strong></p>
+          <div style={{ color: '#fff', fontSize: '1.3rem', fontWeight: 'bold', padding: '15px', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', marginBottom: '25px', border: '1px dashed #ecc94b' }}>
+            ¡LOGRASTE SALIR DE LA TORRE!
+          </div>
+          <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+            <button style={{ padding: '12px 25px', fontSize: '16px', cursor: 'pointer', background: '#ecc94b', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '6px' }} onClick={handleIniciarJuego}>Jugar de Nuevo</button>
+            <button style={{ padding: '12px 25px', fontSize: '16px', cursor: 'pointer', background: '#4a5568', color: '#fff', border: 'none', borderRadius: '6px' }} onClick={() => { setIsGameOver(false); setIsVictory(false); }}>Menú Principal</button>
           </div>
         </div>
       )}
