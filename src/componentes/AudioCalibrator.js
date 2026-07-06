@@ -8,7 +8,7 @@ export default function AudioCalibrator({ onJump }) {
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const streamRef = useRef(null); 
-  // 🎤 Detección por "flanco de subida": en vez de un cooldown fijo (que hacía
+  // Detección por "flanco de subida": en vez de un cooldown fijo (que hacía
   // que el segundo grito llegara demasiado tarde, cuando el personaje ya había
   // aterrizado, perdiendo la ventana del doble salto), ahora se dispara un salto
   // apenas el volumen CRUZA el umbral hacia arriba, y no vuelve a disparar hasta
@@ -18,7 +18,7 @@ export default function AudioCalibrator({ onJump }) {
   const ultimoSaltoTsRef = useRef(0);
 
   useEffect(() => {
-    // 🛡️ Bandera anti-carrera: en desarrollo, React (Strict Mode) monta, desmonta
+    // Bandera anti-carrera: en desarrollo, React (Strict Mode) monta, desmonta
     // y vuelve a montar este efecto una vez para detectar bugs. Como getUserMedia
     // es asíncrono, si el desmontaje ocurre justo mientras el mic está iniciando,
     // sin esta bandera el código seguiría configurando el micrófono/AudioContext

@@ -9,13 +9,13 @@ export default function Home() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false); 
   const [showSettings, setShowSettings] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false); // Estado para colapsar instrucciones
   const [controlMethod, setControlMethod] = useState<'voz' | 'teclado'>('teclado'); 
   
   const [jugadores, setJugadores] = useState<string[]>(['Invitado']);
   const [jugadorActivo, setJugadorActivo] = useState<string>('Invitado');
   const [nuevoNombre, setNuevoNombre] = useState<string>('');
   
-  // AHORA EL RECORD ALMACENA EL NIVEL MÁXIMO (1, 2 o 3)
   const [highScore, setHighScore] = useState(1);
   const [currentScore, setCurrentScore] = useState(1);
   
@@ -52,7 +52,7 @@ export default function Home() {
     return () => window.removeEventListener('click', forzarReproduccion);
   }, [isPlaying]);
 
-  // 🌗 Baja el volumen de una pista gradualmente hasta 0 y la pausa (fundido de salida)
+  // Baja el volumen de una pista gradualmente hasta 0 y la pausa (fundido de salida)
   const fundidoSalidaYPausa = (audio: HTMLAudioElement, duracionMs = 600) => {
     const pasos = 20;
     const intervaloMs = duracionMs / pasos;
@@ -65,7 +65,7 @@ export default function Home() {
         clearInterval(intervalo);
         audio.pause();
         audio.currentTime = 0;
-        audio.volume = volumenInicial; // restaurar para la próxima vez que se reproduzca desde el inicio
+        audio.volume = volumenInicial; 
       }
     }, intervaloMs);
   };
@@ -73,11 +73,8 @@ export default function Home() {
   useEffect(() => {
     if (!audioTagRef.current) return;
     if (isPlaying) {
-      // Se está jugando un nivel: nos aseguramos de que quede pausada
-      // (el fundido de salida ya la lleva a 0 y la pausa desde handleIniciarJuego)
       audioTagRef.current.pause();
     } else {
-      // Volvemos al menú o llegamos a Game Over: SIEMPRE desde el inicio, no reanudar donde quedó
       audioTagRef.current.currentTime = 0;
       audioTagRef.current.volume = muteRef.current ? 0 : 0.6;
       if (!muteRef.current) {
@@ -92,7 +89,7 @@ export default function Home() {
     if (recordEspecifico) {
       setHighScore(parseInt(recordEspecifico, 10));
     } else {
-      setHighScore(1); // El nivel base por defecto es 1
+      setHighScore(1); 
     }
     localStorage.setItem('vt_jugador_activo', jugadorActivo);
   }, [jugadorActivo, controlMethod]);
@@ -103,7 +100,6 @@ export default function Home() {
     const nuevoEstadoMute = !muteRef.current;
     muteRef.current = nuevoEstadoMute;
 
-    // Música de portada (menú / pantalla de Game Over)
     if (audioTagRef.current) {
       audioTagRef.current.muted = nuevoEstadoMute;
       if (!isPlaying) {
@@ -116,7 +112,6 @@ export default function Home() {
       }
     }
 
-    // Música de nivel + efectos de sonido del personaje (si se está jugando)
     if (gameCanvasRef.current) {
       gameCanvasRef.current.setMuted(nuevoEstadoMute);
     }
@@ -149,10 +144,6 @@ export default function Home() {
     }
   }, [isPaused]);
 
-  // RECIBE EL NIVEL ALCANZADO DESDE EL CANVAS AL MORIR O GANAR
-  // Envuelta en useCallback: si no lo estuviera, GameCanvas recibiría una función
-  // "nueva" en cada render de Home, obligando a su efecto pesado (game loop, listeners,
-  // carga de imágenes) a destruirse y reconstruirse innecesariamente en cada render.
   const handleGameOver = useCallback((nivelAlcanzado: number) => {
     setCurrentScore(nivelAlcanzado); 
     setHighScore((anterior) => {
@@ -167,7 +158,7 @@ export default function Home() {
     setIsPaused(false);
   }, [jugadorActivo, controlMethod]);
 
-  // INICIA (O REINICIA) EL JUEGO: funde la música de portada mientras arranca la del nivel 1
+  // 🛠️ FUNCIÓN COMPLETAMENTE DECLARADA Y REESTABLECIDA
   const handleIniciarJuego = () => {
     if (audioTagRef.current && !muteRef.current && !audioTagRef.current.paused) {
       fundidoSalidaYPausa(audioTagRef.current, 600);
@@ -224,15 +215,55 @@ export default function Home() {
             </div>
           </div>
 
-          {/* INDICADOR MODIFICADO A NIVELES */}
           <div style={{ background: '#2d3748', padding: '12px 25px', borderRadius: '8px', border: '2px dashed #ecc94b', fontSize: '1.1rem', color: '#ecc94b', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
-            MÁXIMO ESCENARIO DE <strong>{jugadorActivo.toUpperCase()}</strong> ({controlMethod.toUpperCase()}): {highScore === 4 ? '¡TORRE COMPLETADA! 🏆' : `NIVEL ${highScore}`}
+            MÁXIMO ESCENARIO DE <strong>{jugadorActivo.toUpperCase()}</strong> ({controlMethod.toUpperCase()}): {highScore === 4 ? '¡TORRE COMPLETADA!' : `NIVEL ${highScore}`}
           </div>
 
           <div style={{ display: 'flex', gap: '10px', background: '#2d3748', padding: '8px', borderRadius: '8px' }}>
             <button onClick={() => setControlMethod('voz')} style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: controlMethod === 'voz' ? '#ecc94b' : '#4a5568', color: controlMethod === 'voz' ? '#000' : '#fff' }}>Voz</button>
             <button onClick={() => setControlMethod('teclado')} style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: controlMethod === 'teclado' ? '#ecc94b' : '#4a5568', color: controlMethod === 'teclado' ? '#000' : '#fff' }}>Teclado</button>
           </div>
+
+          {/* BOTÓN PARA DESPLEGAR/OCULTAR INSTRUCCIONES */}
+          <button 
+            style={{ padding: '12px 20px', fontSize: '16px', cursor: 'pointer', background: '#2b6cb0', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', width: '100%', maxWidth: '340px' }} 
+            onClick={() => setShowInstructions(!showInstructions)}
+          >
+            {showInstructions ? 'Ocultar Instrucciones' : 'Ver Instrucciones de Juego'}
+          </button>
+
+          {/* RENDERING CONDICIONAL DE LAS INSTRUCCIONES */}
+          {showInstructions && (
+            <div style={{ background: '#1a202c', width: '100%', padding: '20px', borderRadius: '8px', border: '2px solid #2b6cb0', boxSizing: 'border-box' }}>
+              <h3 style={{ margin: '0 0 12px 0', color: '#ecc94b', fontSize: '1.1rem', textAlign: 'center', textDecoration: 'underline' }}>INSTRUCCIONES DE SUPERVIVENCIA</h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px', lineHeight: '1.5' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0', color: '#63b3ed' }}> Controles Básicos:</h4>
+                  <ul style={{ margin: '0', paddingLeft: '20px' }}>
+                    <li><strong>Flecha Izquierda / Derecha:</strong> Mueven al Caballero horizontalmente sobre los escalones.</li>
+                    <li>
+                      {controlMethod === 'teclado' ? (
+                        <span><strong>Barra Espaciadora:</strong> Ejecuta saltos (¡Presiona 2 veces para un <strong>Doble Salto</strong>!).</span>
+                      ) : (
+                        <span><strong>Tu Propia Voz:</strong> Emite ruidos cortos/fuertes frente al micrófono para saltar. ¡Hacer un segundo ruido en el aire activa el <strong>Doble Salto</strong>!</span>
+                      )}
+                    </li>
+                  </ul>
+                </div>
+                
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0', color: '#e53e3e' }}> Reglas y Peligros:</h4>
+                  <ul style={{ margin: '0', paddingLeft: '20px' }}>
+                    <li><strong>Caída Crítica:</strong> Si caes al vacío o desciendes demasiada distancia de golpe, perderás un ❤️.</li>
+                    <li><strong>El Vacío Ascendente:</strong> No te quedes abajo; si la primera plataforma te pasa por arriba, es muerte instantánea.</li>
+                    <li><strong> Slimes (Nivel 3):</strong> Te dañan de lado. <strong>¡Sáltales en la cabeza</strong> para destruirlos y rebotar!</li>
+                    <li><strong> Portales:</strong> Llega a la parte más alta de cada nivel para teletransportarte al siguiente escenario.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
 
           <button style={{ padding: '15px 40px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', background: '#38a169', color: 'white', border: 'none', borderRadius: '6px', boxShadow: '0 5px #22543d' }} onClick={handleIniciarJuego}>¡INICIAR JUEGO!</button>
           <button style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px' }} onClick={() => setShowSettings(!showSettings)}>{showSettings ? 'Ocultar Ajustes' : 'Configurar Dispositivo'}</button>
@@ -246,7 +277,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* PANTALLA GAME OVER MODIFICADA A NIVELES */}
+      {/* PANTALLA GAME OVER */}
       {isGameOver && (
         <div style={{ textAlign: 'center', margin: '30px 0', background: '#742a2a', padding: '25px', borderRadius: '8px', border: '2px solid #e53e3e' }}>
           <h2 style={{ color: '#fff', fontSize: '2rem', marginBottom: '10px' }}>
@@ -290,7 +321,7 @@ export default function Home() {
                 style={{
                   position: 'absolute',
                   top: 0, left: 0, right: 0, bottom: 0,
-                  background: 'rgba(10, 15, 25, 0.55)', // semitransparente: el personaje pausado se ve de fondo
+                  background: 'rgba(10, 15, 25, 0.55)', 
                   backdropFilter: 'blur(2px)',
                   display: 'flex',
                   alignItems: 'center',

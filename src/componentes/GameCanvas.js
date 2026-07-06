@@ -33,7 +33,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
 
   const isMutedRef = useRef(initialMuted);
 
-  // ⚙️ OPTIMIZACIÓN: isPaused y onGameOver como refs, sincronizados en cada render.
+  // OPTIMIZACIÓN: isPaused y onGameOver como refs, sincronizados en cada render.
   // Así el efecto pesado (game loop, listeners, carga de imágenes) puede montarse
   // UNA sola vez (deps: []) y leer siempre el valor más reciente sin necesitar
   // destruirse y reconstruirse cada vez que estos props cambian de identidad o valor.
@@ -889,7 +889,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       window.removeEventListener('keydown', manejarKeyDown);
       window.removeEventListener('keyup', manejarKeyUp);
     };
-    // ⚙️ OPTIMIZACIÓN: deps: [] — este efecto (game loop, imágenes, listeners) se
+    // OPTIMIZACIÓN: deps: [] — este efecto (game loop, imágenes, listeners) se
     // monta UNA sola vez. isPaused y onGameOver ya no son necesarios aquí porque
     // el loop los lee siempre actualizados vía isPausedRef/onGameOverRef.
   }, []);
