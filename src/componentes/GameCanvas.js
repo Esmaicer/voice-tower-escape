@@ -55,7 +55,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     fuerzaSalto: -8.2,
     velocidadCubo: 3.5, 
     nivelActual: 1,
-    metrosParaSiguienteNivel: 50, 
+    metrosParaSiguienteNivel: 140, // ⬆️ más altura/distancia por nivel (antes 90, y 50 originalmente)
 
     dobleSaltoDisponible: true,
     vidas: 5,
@@ -283,6 +283,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       const enemigos = [];
       for (let i = 1; i < plataformas.length - 1; i++) {
         const plat = plataformas[i];
+        // Probabilidad de spawn de slime por plataforma elegible
         if (Math.random() < 0.45 && plat.width > 80) {
           enemigos.push({
             id: i,
@@ -302,29 +303,33 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       return enemigos;
     };
 
-    // 💗 Coloca SIEMPRE 3 corazones de vida por nivel, sin importar si al jugador
-    // ya le sobran vidas al llegar: quedan ahí como reserva por si más adelante,
-    // en ese mismo nivel, pierde una vida y necesita recuperarla.
+    // 💗 Coloca SIEMPRE 3 corazones de vida por nivel, uno repartido en el tercio
+    // inferior, otro en el medio y otro en el superior del nivel, para que estén
+    // dispersos en vez de agrupados y sea más complicado recogerlos los 3.
     // Esta función corre para CUALQUIER nivel (1, 2 o 3) desde generarPlataformasDelNivel.
     const generarCorazonesDelNivel = (plataformas) => {
-      // Preferimos las plataformas más angostas (más difíciles de aterrizar)
-      let candidatas = plataformas.filter(
-        (plat, idx) => !plat.esPortal && idx !== 0 && plat.width <= 90
-      );
-
-      // Si no hay 3 plataformas angostas disponibles, completamos con cualquier
-      // otra plataforma normal para llegar a los 3 corazones siempre que se pueda.
-      if (candidatas.length < 3) {
-        const resto = plataformas.filter(
-          (plat, idx) => !plat.esPortal && idx !== 0 && plat.width > 90
-        );
-        candidatas = [...candidatas, ...resto];
-      }
+      const candidatas = plataformas.filter((plat, idx) => !plat.esPortal && idx !== 0);
       if (candidatas.length === 0) return [];
 
-      const barajadas = [...candidatas].sort(() => Math.random() - 0.5);
-      const cantidad = Math.min(3, barajadas.length);
-      const seleccionadas = barajadas.slice(0, cantidad);
+      // Ordenamos de abajo hacia arriba (mayor Y = más abajo) para dividir en tercios
+      const ordenadas = [...candidatas].sort((a, b) => b.y - a.y);
+      const tercio = Math.max(1, Math.ceil(ordenadas.length / 3));
+
+      const grupoInferior = ordenadas.slice(0, tercio);
+      const grupoMedio = ordenadas.slice(tercio, tercio * 2);
+      const grupoSuperior = ordenadas.slice(tercio * 2);
+
+      // Dentro de cada tercio, preferimos las plataformas angostas (más difíciles)
+      const elegirDeGrupo = (grupo) => {
+        if (grupo.length === 0) return null;
+        const angostas = grupo.filter((plat) => plat.width <= 90);
+        const pool = angostas.length > 0 ? angostas : grupo;
+        return pool[Math.floor(Math.random() * pool.length)];
+      };
+
+      const seleccionadas = [grupoInferior, grupoMedio, grupoSuperior]
+        .map(elegirDeGrupo)
+        .filter(Boolean);
 
       return seleccionadas.map((plat) => ({
         x: plat.x + plat.width / 2 - 10,
@@ -333,42 +338,33 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       }));
     };
 
+    // 🔪 Genera cuchillas/sierras distribuidas por TODA la altura del nivel 2.
+    // Al ser procedural (en vez de 4 posiciones fijas), automáticamente aparecen
+    // más cuchillas si el nivel es más alto (más metrosParaSiguienteNivel).
     const generarSierrasDelNivel2 = () => {
-      return [
-        {
-          x: 150,
-          y: 400,
-          width: 150,
-          height: 130,
-          hitbox: 45,
-          angulo: 0
-        },
-        {
-          x: 520,
-          y: 330,
-          width: 150,
-          height: 130,
-          hitbox: 45,
-          angulo: 0
-        },
-        {
-          x: 250,
-          y: 200,
-          width: 150,
-          height: 130,
-          hitbox: 45,
-          angulo: 0
-        },
-        {
-          x: 610,
-          y: 120,
-          width: 150,
-          height: 130,
-          hitbox: 45,
-          angulo: 0
-        }
-      ];
-    }
+      const sierras = [];
+      const TAMANO_SIERRA = 105; // width === height: cuadrado perfecto → se ve redonda, no ovalada
+      const HITBOX_SIERRA = 34;  // hitbox reducido en proporción al nuevo tamaño
+      const alturaTotalNivel = gameState.current.metrosParaSiguienteNivel * 10;
+      const limiteYPortal = 520 - alturaTotalNivel;
+      const limiteSuperior = limiteYPortal + 60; // pequeño margen cerca del portal
+      const margenLateral = 90;
+
+      let yActual = 380; // primera cuchilla un poco por encima del suelo inicial
+      while (yActual > limiteSuperior) {
+        sierras.push({
+          x: margenLateral + Math.floor(Math.random() * (canvas.width - margenLateral * 2 - TAMANO_SIERRA)),
+          y: yActual,
+          width: TAMANO_SIERRA,
+          height: TAMANO_SIERRA,
+          hitbox: HITBOX_SIERRA,
+          angulo: Math.random() * Math.PI * 2
+        });
+        // Separación vertical entre cuchillas: entre 110 y 150px
+        yActual -= 110 + Math.floor(Math.random() * 40);
+      }
+      return sierras;
+    };
 
     const generarPlataformasDelNivel = () => {
       const state = gameState.current;
@@ -393,7 +389,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         state.enemigos = [];
       }
 
-      if (state.nivelActual === 2 || state.nivelActual === 3) {
+      if (state.nivelActual === 2) {
         state.sierras = generarSierrasDelNivel2();
       } else {
         state.sierras = [];
@@ -470,7 +466,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       }
 
       // Rotacion de SIERRAS (nivel 2 y 3)
-      if (state.nivelActual === 2 || state.nivelActual === 3) {
+      if (state.nivelActual === 2) {
         for (let sierra of state.sierras) {
           sierra.angulo += 0.004;
           if (sierra.angulo >= 2 * Math.PI) sierra.angulo -= 2 * Math.PI;
@@ -743,7 +739,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       }
 
       // COLISIÓN CON SIERRAS (nivel 2 y 3)
-      if ((state.nivelActual === 2 || state.nivelActual === 3) && !state.inmune) {
+      if (state.nivelActual === 2 && !state.inmune) {
         for (let sierra of state.sierras) {
 
           if (
@@ -803,8 +799,14 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      if (state.nivelActual === 2 || state.nivelActual === 3) {
+      if (state.nivelActual === 2) {
         const img = imgSierraRef.current;
+        // El archivo sierra.png mide 1536x1024 (mucho más ancho que alto), pero el
+        // dibujo de la cuchilla en sí ocupa solo una región casi cuadrada dentro de
+        // ese lienzo. Si se estira la imagen COMPLETA (1536x1024) a un cuadro
+        // cuadrado de destino, el círculo se deforma en óvalo. Por eso recortamos
+        // (9 argumentos de drawImage) solo esa región antes de escalarla.
+        const RECORTE_SIERRA = { sx: 357, sy: 82, sw: 820, sh: 820 }; // recorte cuadrado exacto (820x820), sin asimetrías
 
         for (let sierra of state.sierras) {
 
@@ -814,7 +816,11 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
 
             ctx.translate(sierra.x + sierra.width / 2, sierra.y + sierra.height / 2);
             ctx.rotate(sierra.angulo);
-            ctx.drawImage(img, -sierra.width / 2, -sierra.height / 2, sierra.width, sierra.height);
+            ctx.drawImage(
+              img,
+              RECORTE_SIERRA.sx, RECORTE_SIERRA.sy, RECORTE_SIERRA.sw, RECORTE_SIERRA.sh,
+              -sierra.width / 2, -sierra.height / 2, sierra.width, sierra.height
+            );
             ctx.restore();
           }
         }
