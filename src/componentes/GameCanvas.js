@@ -12,7 +12,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
   const imgPlataformasRef = useRef(null);
   const imgPortalVerdeRef = useRef(null);
 
-  // REFERENCIA PARA SIERRRAS
+  // REFERENCIA PARA SIERRAS
   const imgSierraRef = useRef(null);
   
   // REFERENCIAS ENEMIGO (SLIME)
@@ -29,14 +29,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
   const audioDobleSaltoRef = useRef(null);
   const audioDanoRef = useRef(null);
   const audioEnemigoMuerteRef = useRef(null);
-  const audioVidaRef = useRef(null); // sonido al recoger un corazón
+  const audioVidaRef = useRef(null);
 
   const isMutedRef = useRef(initialMuted);
 
-  // OPTIMIZACIÓN: isPaused y onGameOver como refs, sincronizados en cada render.
-  // Así el efecto pesado (game loop, listeners, carga de imágenes) puede montarse
-  // UNA sola vez (deps: []) y leer siempre el valor más reciente sin necesitar
-  // destruirse y reconstruirse cada vez que estos props cambian de identidad o valor.
   const isPausedRef = useRef(isPaused);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
 
@@ -47,19 +43,19 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
   const gameState = useRef({
     personaje: { x: 380, y: 400, vx: 0, vy: 0, size: 40, enSuelo: false },
     plataformas: [],
-    enemigos: [], // Lista de enemigos activos
-    corazones: [], // Corazones de vida recolectables en la plataforma
-    sierras: [], // Lista de sierras activas
+    enemigos: [], 
+    corazones: [], 
+    sierras: [], 
     camaraY: 0,
     gravedad: 0.32,
     fuerzaSalto: -8.2,
     velocidadCubo: 3.5, 
     nivelActual: 1,
-    metrosParaSiguienteNivel: 140, // ⬆️ más altura/distancia por nivel (antes 90, y 50 originalmente)
+    metrosParaSiguienteNivel: 140, 
 
     dobleSaltoDisponible: true,
     vidas: 5,
-    vidasMaximas: 5, // tope de corazones; al llegar aquí, los corazones en el mapa desaparecen solos
+    vidasMaximas: 5, 
     puntoMasAltoAlcanzadoY: 400, 
     caidaCriticaDistancia: 200,
     inmune: false,
@@ -92,12 +88,13 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     imgSlimeMuerteRef.current.src = '/imagenes/Muerte.png';
 
     imgSierraRef.current = new Image();
-    imgSierraRef.current.src = '/imagenes/sierra.png';
+    imgSierraRef.current.src = '/imagenes/Sierra.png';
 
     musicaPistasRef.current = {
       1: new Audio('/sonido/musica-nivel1.mp3'),
       2: new Audio('/sonido/musica-nivel2.mp3'),
       3: new Audio('/sonido/musica-nivel3.mp3'),
+      4: new Audio('/sonido/musica-nivel3.mp3'), // Puedes cambiarla por música de Boss final
     };
     Object.values(musicaPistasRef.current).forEach((pista) => {
       pista.loop = true;
@@ -121,7 +118,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     audioEnemigoMuerteRef.current.volume = 0.5;
     audioEnemigoMuerteRef.current.muted = isMutedRef.current;
 
-    // Sonido al recoger un corazón de vida
     audioVidaRef.current = new Audio('/sonido/vida.mp3');
     audioVidaRef.current.volume = 0.6;
     audioVidaRef.current.muted = isMutedRef.current;
@@ -237,7 +233,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     const fondosNiveles = {
       1: '/imagenes/fondo-torre.png',
       2: '/imagenes/fondo-torre2.png',
-      3: '/imagenes/fondo-torre3.png'
+      3: '/imagenes/fondo-torre3.png',
+      4: '/imagenes/fondo-torre4.png' 
     };
 
     const imagenFondo = new Image();
@@ -279,12 +276,11 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     window.addEventListener('keydown', manejarKeyDown);
     window.addEventListener('keyup', manejarKeyUp);
 
-    const generarEnemigosNivel3 = (plataformas) => {
+    const generarEnemigosSlimes = (plataformas, probabilidad = 0.45) => {
       const enemigos = [];
       for (let i = 1; i < plataformas.length - 1; i++) {
         const plat = plataformas[i];
-        // Probabilidad de spawn de slime por plataforma elegible
-        if (Math.random() < 0.45 && plat.width > 80) {
+        if (Math.random() < probabilidad && plat.width > 80) {
           enemigos.push({
             id: i,
             x: plat.x + (plat.width / 2) - 17,
@@ -303,15 +299,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       return enemigos;
     };
 
-    // 💗 Coloca SIEMPRE 3 corazones de vida por nivel, uno repartido en el tercio
-    // inferior, otro en el medio y otro en el superior del nivel, para que estén
-    // dispersos en vez de agrupados y sea más complicado recogerlos los 3.
-    // Esta función corre para CUALQUIER nivel (1, 2 o 3) desde generarPlataformasDelNivel.
     const generarCorazonesDelNivel = (plataformas) => {
       const candidatas = plataformas.filter((plat, idx) => !plat.esPortal && idx !== 0);
       if (candidatas.length === 0) return [];
 
-      // Ordenamos de abajo hacia arriba (mayor Y = más abajo) para dividir en tercios
       const ordenadas = [...candidatas].sort((a, b) => b.y - a.y);
       const tercio = Math.max(1, Math.ceil(ordenadas.length / 3));
 
@@ -319,11 +310,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       const grupoMedio = ordenadas.slice(tercio, tercio * 2);
       const grupoSuperior = ordenadas.slice(tercio * 2);
 
-      // Dentro de cada tercio, preferimos las plataformas angostas (más difíciles)
       const elegirDeGrupo = (grupo) => {
         if (grupo.length === 0) return null;
-        const angostas = grupo.filter((plat) => plat.width <= 90);
-        const pool = angostas.length > 0 ? angostas : grupo;
+        const angostas = group => group.filter((plat) => plat.width <= 90);
+        const pool = angostas(grupo).length > 0 ? angostas(grupo) : grupo;
         return pool[Math.floor(Math.random() * pool.length)];
       };
 
@@ -338,19 +328,17 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       }));
     };
 
-    // 🔪 Genera cuchillas/sierras distribuidas por TODA la altura del nivel 2.
-    // Al ser procedural (en vez de 4 posiciones fijas), automáticamente aparecen
-    // más cuchillas si el nivel es más alto (más metrosParaSiguienteNivel).
-    const generarSierrasDelNivel2 = () => {
+    // Genera sierras distribuidas por la altura del escenario
+    const generarSierrasDelNivel = () => {
       const sierras = [];
-      const TAMANO_SIERRA = 105; // width === height: cuadrado perfecto → se ve redonda, no ovalada
-      const HITBOX_SIERRA = 34;  // hitbox reducido en proporción al nuevo tamaño
+      const TAMANO_SIERRA = 105; 
+      const HITBOX_SIERRA = 34;  
       const alturaTotalNivel = gameState.current.metrosParaSiguienteNivel * 10;
       const limiteYPortal = 520 - alturaTotalNivel;
-      const limiteSuperior = limiteYPortal + 60; // pequeño margen cerca del portal
+      const limiteSuperior = limiteYPortal + 60; 
       const margenLateral = 90;
 
-      let yActual = 380; // primera cuchilla un poco por encima del suelo inicial
+      let yActual = 380; 
       while (yActual > limiteSuperior) {
         sierras.push({
           x: margenLateral + Math.floor(Math.random() * (canvas.width - margenLateral * 2 - TAMANO_SIERRA)),
@@ -360,7 +348,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
           hitbox: HITBOX_SIERRA,
           angulo: Math.random() * Math.PI * 2
         });
-        // Separación vertical entre cuchillas: entre 110 y 150px
         yActual -= 110 + Math.floor(Math.random() * 40);
       }
       return sierras;
@@ -383,15 +370,19 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       lista.push({ x: (canvas.width / 2) - 60, y: limiteYPortal, width: 120, height: 15, esPortal: true });
       state.plataformas = lista;
       
-      if (state.nivelActual === 3) {
-        state.enemigos = generarEnemigosNivel3(lista);
+      // Control de Spawn de Obstáculos y Enemigos por nivel
+      if (state.nivelActual === 2) {
+        state.enemigos = [];
+        state.sierras = generarSierrasDelNivel();
+      } else if (state.nivelActual === 3) {
+        state.enemigos = generarEnemigosSlimes(lista, 0.45);
+        state.sierras = [];
+      } else if (state.nivelActual === 4) {
+        // COMBINACIÓN FINAL NIVEL 4: Sierras y Slimes juntos
+        state.enemigos = generarEnemigosSlimes(lista, 0.30);
+        state.sierras = generarSierrasDelNivel();
       } else {
         state.enemigos = [];
-      }
-
-      if (state.nivelActual === 2) {
-        state.sierras = generarSierrasDelNivel2();
-      } else {
         state.sierras = [];
       }
 
@@ -414,16 +405,12 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       const p = state.personaje;
 
       if (isPausedRef.current) {
-        // Ya no se dibuja nada aquí: el modal de pausa ahora es un overlay HTML real
-        // en page.tsx (semitransparente, con los botones de Reanudar/Salir). Al no
-        // tocar el canvas, el último fotograma queda "congelado" tal cual se ve
-        // detrás del modal, mostrando al personaje pausado de fondo.
         loopId = requestAnimationFrame(gameLoop);
         return;
       }
 
       // ==========================================
-      // A. FÍSICAS JUGADOR
+      // A. FÍSICAS GENERALES
       // ==========================================
       p.x += p.vx;
       if (p.x < 0) p.x = 0;
@@ -436,8 +423,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         state.puntoMasAltoAlcanzadoY = p.y;
       }
 
-      // ACTUALIZACIÓN DE ENEMIGOS Y PATRULLA EFECTIVA
-      if (state.nivelActual === 3) {
+      // Actualizar patrulla de Slimes (Niveles 3 y 4)
+      if (state.nivelActual === 3 || state.nivelActual === 4) {
         for (let ene of state.enemigos) {
           if (ene.estado === 'muerto') {
             ene.contadorAnim++;
@@ -448,10 +435,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
             continue; 
           }
 
-          // Desplazamiento horizontal continuo
           ene.x += ene.vx;
-
-          // Corrección: El rebote evalúa dinámicamente los bordes actuales de la plataforma
           if (ene.x <= ene.platLeft || ene.x + ene.sizeX >= ene.platRight) {
             ene.vx *= -1;
             ene.x = ene.x <= ene.platLeft ? ene.platLeft : ene.platRight - ene.sizeX;
@@ -465,10 +449,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      // Rotacion de SIERRAS (nivel 2 y 3)
-      if (state.nivelActual === 2) {
+      // Rotación de Sierras (Niveles 2 y 4)
+      if (state.nivelActual === 2 || state.nivelActual === 4) {
         for (let sierra of state.sierras) {
-          sierra.angulo += 0.004;
+          sierra.angulo += 0.04;
           if (sierra.angulo >= 2 * Math.PI) sierra.angulo -= 2 * Math.PI;
         }
       }
@@ -497,7 +481,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
               p.vx = 0;
               cancelAnimationFrame(loopId);
 
-              if (state.nivelActual < 3) {
+              // ACTUALIZADO HASTA NIVEL 4
+              if (state.nivelActual < 4) {
                 state.nivelActual += 1;
                 state.camaraY = 0;
                 cambiarMusicaDeFondo(state.nivelActual);
@@ -514,16 +499,13 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
                 ctx.textAlign = 'center';
                 ctx.fillText(`¡PORTAL COMPLETADO! ESCENARIO ${state.nivelActual}`, canvas.width / 2, canvas.height / 2);
 
-                // Se guarda el ID para poder cancelarlo si el componente se desmonta
-                // o el efecto se reinicia mientras esta transición está pendiente
-                // (evita loops de juego huérfanos corriendo en paralelo).
                 timeoutTransicionNivelId = setTimeout(() => {
                   generarPlataformasDelNivel();
                   loopId = requestAnimationFrame(gameLoop);
                 }, 1200);
               } else {
                 if (musicaActualRef.current) musicaActualRef.current.pause();
-                onGameOverRef.current(4);
+                onGameOverRef.current(5); // Victoria absoluta al pasar el nivel 4
               }
               return;
             }
@@ -556,20 +538,17 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
             p.y + p.size > corazon.y &&
             p.y < corazon.y + corazon.size;
 
-          // Solo se recoge (y desaparece) si el jugador realmente tiene una vida faltante.
-          // Si ya tiene las vidas completas, el corazón se queda en la plataforma tal cual,
-          // por si más adelante en este mismo nivel pierde una vida y necesita recuperarla.
           if (colisiona && state.vidas < state.vidasMaximas) {
             state.vidas = Math.min(state.vidas + 1, state.vidasMaximas);
             reproducirEfecto(audioVidaRef);
-            return false; // se recoge y desaparece
+            return false; 
           }
-          return true; // se mantiene en la plataforma
+          return true; 
         });
       }
 
-      // DAÑO Y ELIMINACIÓN DE ENEMIGOS (CORREGIDO)
-      if (state.nivelActual === 3 && !state.inmune) {
+      // COLISIONES CON SLIMES (Niveles 3 y 4)
+      if ((state.nivelActual === 3 || state.nivelActual === 4) && !state.inmune) {
         for (let ene of state.enemigos) {
           if (ene.estado === 'muerto') continue;
 
@@ -579,27 +558,21 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
             p.y + p.size > ene.y &&
             p.y < ene.y + ene.sizeY
           ) {
-            // Caso A: Pisarle la cabeza cayendo
             if (p.vy > 0 && p.y + p.size - p.vy <= ene.y + 12) {
               ene.estado = 'muerto';
               ene.cuadroAnim = 0;
               ene.contadorAnim = 0;
-              p.vy = state.fuerzaSalto * 0.85; // Salto de rebote
+              p.vy = state.fuerzaSalto * 0.85; 
               reproducirEfecto(audioEnemigoMuerteRef);
-            } 
-            // Caso B: Choque lateral (Recibe daño el jugador)
-            else {
+            } else {
               state.vidas -= 1;
               state.inmune = true;
               ene.estado = 'alerta';
               ene.cuadroAnim = 0;
               ene.contadorAnim = 0;
               reproducirEfecto(audioDanoRef);
-              
-              // Pequeño rebote controlado hacia arriba en lugar de empuje lateral para evitar bugs de control
               p.vy = -3.5;
 
-              // Temporizador para quitar la inmunidad del jugador y restablecer la patrulla del slime
               setTimeout(() => {
                 state.inmune = false;
                 if (ene.estado === 'alerta') ene.estado = 'patrulla';
@@ -609,8 +582,30 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
+      // COLISIONES CON SIERRAS (Niveles 2 y 4)
+      if ((state.nivelActual === 2 || state.nivelActual === 4) && !state.inmune) {
+        for (let sierra of state.sierras) {
+          if (
+            p.x + p.size > sierra.x + (sierra.width - sierra.hitbox) / 2 &&
+            p.x < sierra.x + (sierra.width - sierra.hitbox) / 2 + sierra.hitbox &&
+            p.y + p.size > sierra.y + (sierra.height - sierra.hitbox) / 2 &&
+            p.y < sierra.y + (sierra.height - sierra.hitbox) / 2 + sierra.hitbox
+          ) {
+            state.vidas--;
+            state.inmune = true;
+            reproducirEfecto(audioDanoRef);
+            p.vy = -4; 
+
+            setTimeout(() => {
+              state.inmune = false;
+            }, 1200);
+            break;
+          }
+        }
+      }
+
       // ==========================================
-      // C. AJUSTE DE CÁMARA (ACTUALIZA PLATAFORMAS Y LÍMITES)
+      // C. CÁMARA FLUIDA (CORREGIDA PARA DAÑO POR CAÍDA)
       // ==========================================
       const limiteSuperior = canvas.height * 0.4; 
       const limiteInferior = canvas.height * 0.7; 
@@ -620,42 +615,23 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         p.y = limiteSuperior;
         state.camaraY += desfase;
         state.puntoMasAltoAlcanzadoY += desfase; 
-        for (let plat of state.plataformas) {
-          plat.y += desfase;
-        }
-        for (let ene of state.enemigos) {
-          ene.y += desfase;
-          ene.platLeft = ene.platLeft; // Se mantienen consistentes
-          ene.platRight = ene.platRight;
-        }
-        for (let cor of state.corazones) {
-          cor.y += desfase;
-        }
-        for (let sierra of state.sierras) {
-          sierra.y += desfase;
-        }
+        for (let plat of state.plataformas) plat.y += desfase;
+        for (let ene of state.enemigos) ene.y += desfase;
+        for (let cor of state.corazones) cor.y += desfase;
+        for (let sierra of state.sierras) sierra.y += desfase;
       } 
       else if (p.y > limiteInferior) {
         const desfase = p.y - limiteInferior;
         p.y = limiteInferior;
         state.camaraY -= desfase; 
         state.puntoMasAltoAlcanzadoY -= desfase; 
-        for (let plat of state.plataformas) {
-          plat.y -= desfase;
-        }
-        for (let ene of state.enemigos) {
-          ene.y -= desfase;
-        }
-        for (let cor of state.corazones) {
-          cor.y -= desfase;
-        }
-        for (let sierra of state.sierras) {
-          sierra.y -= desfase;
-        }
+        for (let plat of state.plataformas) plat.y -= desfase;
+        for (let ene of state.enemigos) ene.y -= desfase;
+        for (let cor of state.corazones) cor.y -= desfase;
+        for (let sierra of state.sierras) sierra.y -= desfase;
       }
 
-      // Corregir posiciones de límites de patrulla dinámicamente según se muevan las plataformas vinculadas
-      if (state.nivelActual === 3) {
+      if (state.nivelActual === 3 || state.nivelActual === 4) {
         for (let ene of state.enemigos) {
           const platAsociada = state.plataformas[ene.id];
           if (platAsociada) {
@@ -722,7 +698,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      // DIBUJAR CORAZONES DE VIDA RECOLECTABLES
+      // DIBUJAR CORAZONES
       if (state.corazones && state.corazones.length > 0) {
         ctx.save();
         ctx.font = '22px sans-serif';
@@ -730,7 +706,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         ctx.textBaseline = 'middle';
         for (let cor of state.corazones) {
           if (cor.y >= -40 && cor.y <= canvas.height + 40) {
-            // Pequeño efecto de flotación para que destaquen sobre la plataforma
             const flotacion = Math.sin(Date.now() / 250 + cor.x) * 3;
             ctx.fillText('❤️', cor.x + cor.size / 2, cor.y + cor.size / 2 + flotacion);
           }
@@ -738,28 +713,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         ctx.restore();
       }
 
-      // COLISIÓN CON SIERRAS (nivel 2 y 3)
-      if (state.nivelActual === 2 && !state.inmune) {
-        for (let sierra of state.sierras) {
-
-          if (
-            p.x + p.size > sierra.x + (sierra.width - sierra.hitbox) / 2 &&
-            p.x < sierra.x + (sierra.width - sierra.hitbox) / 2 + sierra.hitbox &&
-            p.y + p.size > sierra.y + (sierra.height - sierra.hitbox) / 2 &&
-            p.y < sierra.y + (sierra.height - sierra.hitbox) / 2 + sierra.hitbox
-          ) {
-            state.vidas--;
-            state.inmune = true;
-            reproducirEfecto(audioDanoRef);
-
-            setTimeout(() => {
-              state.inmune = false;
-            }, 1200);
-            break;
-          }
-        }
-      }
-      if (state.nivelActual === 3) {
+      // DIBUJAR ENEMIGOS (SLIMES - Niveles 3 y 4)
+      if (state.nivelActual === 3 || state.nivelActual === 4) {
         for (let ene of state.enemigos) {
           if (ene.y < -40 || ene.y > canvas.height + 40) continue;
 
@@ -774,7 +729,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
             totalCuadrosEne = 4;
           }
 
-          // Verificación de carga limpia
           if (imgEne && imgEne.complete && imgEne.naturalWidth > 0) {
             const anchoFrame = imgEne.naturalWidth / totalCuadrosEne;
             const altoFrame = imgEne.naturalHeight;
@@ -790,7 +744,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
             }
             ctx.restore();
           } else {
-            // Respaldo visual: Si el sprite falla, se dibuja un Slime circular verde en lugar de un cubo rojo confuso
             ctx.fillStyle = '#22c55e';
             ctx.beginPath();
             ctx.arc(ene.x + ene.sizeX / 2, ene.y + ene.sizeY / 2, ene.sizeY / 2, 0, Math.PI * 2);
@@ -799,21 +752,14 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      if (state.nivelActual === 2) {
+      // DIBUJAR SIERRAS (Niveles 2 y 4)
+      if (state.nivelActual === 2 || state.nivelActual === 4) {
         const img = imgSierraRef.current;
-        // El archivo sierra.png mide 1536x1024 (mucho más ancho que alto), pero el
-        // dibujo de la cuchilla en sí ocupa solo una región casi cuadrada dentro de
-        // ese lienzo. Si se estira la imagen COMPLETA (1536x1024) a un cuadro
-        // cuadrado de destino, el círculo se deforma en óvalo. Por eso recortamos
-        // (9 argumentos de drawImage) solo esa región antes de escalarla.
-        const RECORTE_SIERRA = { sx: 357, sy: 82, sw: 820, sh: 820 }; // recorte cuadrado exacto (820x820), sin asimetrías
+        const RECORTE_SIERRA = { sx: 357, sy: 82, sw: 820, sh: 820 }; 
 
         for (let sierra of state.sierras) {
-
           if (img && img.complete && img.naturalWidth > 0) {
-
             ctx.save();
-
             ctx.translate(sierra.x + sierra.width / 2, sierra.y + sierra.height / 2);
             ctx.rotate(sierra.angulo);
             ctx.drawImage(
@@ -821,6 +767,16 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
               RECORTE_SIERRA.sx, RECORTE_SIERRA.sy, RECORTE_SIERRA.sw, RECORTE_SIERRA.sh,
               -sierra.width / 2, -sierra.height / 2, sierra.width, sierra.height
             );
+            ctx.restore();
+          } else {
+            // Respaldo visual geométrico si no lee la imagen
+            ctx.save();
+            ctx.translate(sierra.x + sierra.width / 2, sierra.y + sierra.height / 2);
+            ctx.rotate(sierra.angulo);
+            ctx.fillStyle = '#718096';
+            ctx.beginPath();
+            ctx.arc(0, 0, sierra.hitbox, 0, Math.PI * 2);
+            ctx.fill();
             ctx.restore();
           }
         }
@@ -866,7 +822,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       ctx.fillStyle = '#63b3ed';
       ctx.font = 'bold 16px "Courier New", monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(`ESCENARIO ACTUAL: ${state.nivelActual}/3`, 80, 35);
+      ctx.fillText(`ESCENARIO ACTUAL: ${state.nivelActual}/4`, 80, 35); // Ajustado a /4
       
       ctx.fillStyle = '#fff';
       ctx.fillText("VIDAS: ", 80, 55);
@@ -882,16 +838,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
 
     return () => {
       cancelAnimationFrame(loopId);
-      // Evita el bug de "loops huérfanos": si el efecto se desmonta/reinicia
-      // mientras la transición de portal está pendiente, cancelamos ese timeout
-      // en vez de dejar que dispare más tarde y arranque un segundo gameLoop.
       if (timeoutTransicionNivelId) clearTimeout(timeoutTransicionNivelId);
       window.removeEventListener('keydown', manejarKeyDown);
       window.removeEventListener('keyup', manejarKeyUp);
     };
-    // OPTIMIZACIÓN: deps: [] — este efecto (game loop, imágenes, listeners) se
-    // monta UNA sola vez. isPaused y onGameOver ya no son necesarios aquí porque
-    // el loop los lee siempre actualizados vía isPausedRef/onGameOverRef.
   }, []);
 
   return (
