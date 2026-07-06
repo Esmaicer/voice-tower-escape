@@ -303,7 +303,6 @@ export default function Home() {
           {!isPaused && (
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '15px' }}>
               <button onClick={() => setIsPaused(!isPaused)} style={{ flex: 1, padding: '10px', background: '#dd6b20', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>Pausar</button>
-              <button onClick={() => { setIsPlaying(false); setIsPaused(false); }} style={{ flex: 1, padding: '10px', background: '#e53e3e', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>Salir al Menú</button>
             </div>
           )}
           {controlMethod === 'voz' && !isPaused && (
