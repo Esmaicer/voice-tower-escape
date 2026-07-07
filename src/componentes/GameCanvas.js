@@ -299,7 +299,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       return enemigos;
     };
 
-    // FUNCIÓN CORREGIDA SIN BUCLES INFINITOS NI VARIABLES NULAS
     const generarCorazonesDelNivel = (plataformas) => {
       const candidatas = plataformas.filter((plat, idx) => !plat.esPortal && idx !== 0);
       if (candidatas.length === 0) return [];
@@ -314,7 +313,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       const elegirDeGrupo = (grupo) => {
         if (grupo.length === 0) return null;
         const angostas = grupo.filter((plat) => plat.width <= 90);
-        const pool = angostas.length > 0 ? angostas : grupo;
+        const pool = angostas.length > 0 ? angostas : group;
         return pool[Math.floor(Math.random() * pool.length)];
       };
 
