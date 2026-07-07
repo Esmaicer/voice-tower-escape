@@ -755,33 +755,50 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       // DIBUJAR SIERRAS (Niveles 2 y 4)
       if (state.nivelActual === 2 || state.nivelActual === 4) {
         const img = imgSierraRef.current;
+        
+        // Parámetros de recorte cuadrado exacto para evitar deformaciones en el sprite de la sierra
         const RECORTE_SIERRA = { sx: 357, sy: 82, sw: 820, sh: 820 }; 
 
         for (let sierra of state.sierras) {
+          if (sierra.y < -120 || sierra.y > canvas.height + 120) continue;
+
+          // Si la imagen ya cargó correctamente en el navegador
           if (img && img.complete && img.naturalWidth > 0) {
             ctx.save();
-            ctx.translate(sierra.x + sierra.width / 2, sierra.y + sierra.height / 2);
+            
+            // Calculamos el centro real de la sierra basándonos en si tiene ancho definido (Nivel 2) o radio (Nivel 4)
+            const centroX = sierra.width ? (sierra.x + sierra.width / 2) : sierra.x;
+            const centroY = sierra.height ? (sierra.y + sierra.height / 2) : sierra.y;
+            const anchoDibujo = sierra.width ? sierra.width : (sierra.radio * 2);
+            const altoDibujo = sierra.height ? sierra.height : (sierra.radio * 2);
+
+            ctx.translate(centroX, centroY);
             ctx.rotate(sierra.angulo);
+            
             ctx.drawImage(
               img,
               RECORTE_SIERRA.sx, RECORTE_SIERRA.sy, RECORTE_SIERRA.sw, RECORTE_SIERRA.sh,
-              -sierra.width / 2, -sierra.height / 2, sierra.width, sierra.height
+              -anchoDibujo / 2, -altoDibujo / 2, anchoDibujo, altoDibujo
             );
+            
             ctx.restore();
           } else {
-            // Respaldo visual geométrico si no lee la imagen
+            // Respaldo visual si el servidor de Vercel tarda un milisegundo en responder
             ctx.save();
-            ctx.translate(sierra.x + sierra.width / 2, sierra.y + sierra.height / 2);
+            const centroX = sierra.width ? (sierra.x + sierra.width / 2) : sierra.x;
+            const centroY = sierra.height ? (sierra.y + sierra.height / 2) : sierra.y;
+            const radioHitbox = sierra.hitbox ? sierra.hitbox : sierra.radio;
+
+            ctx.translate(centroX, centroY);
             ctx.rotate(sierra.angulo);
             ctx.fillStyle = '#718096';
             ctx.beginPath();
-            ctx.arc(0, 0, sierra.hitbox, 0, Math.PI * 2);
+            ctx.arc(0, 0, radioHitbox, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
           }
         }
       }
-
       // RENDERIZADO DEL JUGADOR
       ctx.save();
       if (state.inmune && Math.floor(Date.now() / 100) % 2 === 0) {
