@@ -64,7 +64,8 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     direccionMirada: 'derecha', 
     cuadroActual: 0,
     contadorAnimacion: 0,
-    ticksPorCuadro: 6 
+    ticksPorCuadro: 6,
+    anguloGlobalSierra: 0 // Ángulo para hacer girar las sierras de forma global
   });
 
   // CARGA DE ASSETS
@@ -87,6 +88,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     imgSlimeMuerteRef.current = new Image();
     imgSlimeMuerteRef.current.src = '/imagenes/Muerte.png';
 
+    // Ruta en estricta mayúscula idéntica al archivo
     imgSierraRef.current = new Image();
     imgSierraRef.current.src = '/imagenes/Sierra.png';
 
@@ -94,7 +96,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       1: new Audio('/sonido/musica-nivel1.mp3'),
       2: new Audio('/sonido/musica-nivel2.mp3'),
       3: new Audio('/sonido/musica-nivel3.mp3'),
-      4: new Audio('/sonido/musica-nivel3.mp3'), // Puedes cambiarla por música de Boss final
+      4: new Audio('/sonido/musica-nivel3.mp3'), 
     };
     Object.values(musicaPistasRef.current).forEach((pista) => {
       pista.loop = true;
@@ -234,7 +236,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       1: '/imagenes/fondo-torre.png',
       2: '/imagenes/fondo-torre2.png',
       3: '/imagenes/fondo-torre3.png',
-      4: '/imagenes/fondo-torre4.png' 
+      4: '/imagenes/fondo-torre4.jpg' 
     };
 
     const imagenFondo = new Image();
@@ -328,7 +330,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       }));
     };
 
-    // Genera sierras distribuidas por la altura del escenario
     const generarSierrasDelNivel = () => {
       const sierras = [];
       const TAMANO_SIERRA = 105; 
@@ -370,7 +371,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       lista.push({ x: (canvas.width / 2) - 60, y: limiteYPortal, width: 120, height: 15, esPortal: true });
       state.plataformas = lista;
       
-      // Control de Spawn de Obstáculos y Enemigos por nivel
       if (state.nivelActual === 2) {
         state.enemigos = [];
         state.sierras = generarSierrasDelNivel();
@@ -378,7 +378,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         state.enemigos = generarEnemigosSlimes(lista, 0.45);
         state.sierras = [];
       } else if (state.nivelActual === 4) {
-        // COMBINACIÓN FINAL NIVEL 4: Sierras y Slimes juntos
         state.enemigos = generarEnemigosSlimes(lista, 0.30);
         state.sierras = generarSierrasDelNivel();
       } else {
@@ -423,7 +422,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         state.puntoMasAltoAlcanzadoY = p.y;
       }
 
-      // Actualizar patrulla de Slimes (Niveles 3 y 4)
+      // Rotación de sierras
+      state.anguloGlobalSierra += 0.05;
+
+      // Actualizar Slimes
       if (state.nivelActual === 3 || state.nivelActual === 4) {
         for (let ene of state.enemigos) {
           if (ene.estado === 'muerto') {
@@ -449,7 +451,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      // Rotación de Sierras (Niveles 2 y 4)
+      // Rotación individual de Sierras
       if (state.nivelActual === 2 || state.nivelActual === 4) {
         for (let sierra of state.sierras) {
           sierra.angulo += 0.04;
@@ -481,7 +483,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
               p.vx = 0;
               cancelAnimationFrame(loopId);
 
-              // ACTUALIZADO HASTA NIVEL 4
               if (state.nivelActual < 4) {
                 state.nivelActual += 1;
                 state.camaraY = 0;
@@ -505,7 +506,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
                 }, 1200);
               } else {
                 if (musicaActualRef.current) musicaActualRef.current.pause();
-                onGameOverRef.current(5); // Victoria absoluta al pasar el nivel 4
+                onGameOverRef.current(5); 
               }
               return;
             }
@@ -527,9 +528,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      // ==========================================
-      // B2. CORAZONES DE VIDA (RECOLECTABLES)
-      // ==========================================
+      // CORAZONES RECOLECTABLES
       if (state.corazones && state.corazones.length > 0) {
         state.corazones = state.corazones.filter((corazon) => {
           const colisiona =
@@ -547,7 +546,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         });
       }
 
-      // COLISIONES CON SLIMES (Niveles 3 y 4)
+      // COLISIONES SLIMES
       if ((state.nivelActual === 3 || state.nivelActual === 4) && !state.inmune) {
         for (let ene of state.enemigos) {
           if (ene.estado === 'muerto') continue;
@@ -582,7 +581,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      // COLISIONES CON SIERRAS (Niveles 2 y 4)
+      // COLISIONES SIERRAS
       if ((state.nivelActual === 2 || state.nivelActual === 4) && !state.inmune) {
         for (let sierra of state.sierras) {
           if (
@@ -605,7 +604,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       }
 
       // ==========================================
-      // C. CÁMARA FLUIDA (CORREGIDA PARA DAÑO POR CAÍDA)
+      // C. CÁMARA FLUIDA
       // ==========================================
       const limiteSuperior = canvas.height * 0.4; 
       const limiteInferior = canvas.height * 0.7; 
@@ -713,7 +712,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         ctx.restore();
       }
 
-      // DIBUJAR ENEMIGOS (SLIMES - Niveles 3 y 4)
+      // DIBUJAR ENEMIGOS (SLIMES)
       if (state.nivelActual === 3 || state.nivelActual === 4) {
         for (let ene of state.enemigos) {
           if (ene.y < -40 || ene.y > canvas.height + 40) continue;
@@ -752,53 +751,39 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      // DIBUJAR SIERRAS (Niveles 2 y 4)
+      // RENDERING CORREGIDO PARA LAS SIERRAS (NIVELES 2 Y 4)
       if (state.nivelActual === 2 || state.nivelActual === 4) {
         const img = imgSierraRef.current;
-        
-        // Parámetros de recorte cuadrado exacto para evitar deformaciones en el sprite de la sierra
         const RECORTE_SIERRA = { sx: 357, sy: 82, sw: 820, sh: 820 }; 
 
         for (let sierra of state.sierras) {
           if (sierra.y < -120 || sierra.y > canvas.height + 120) continue;
 
-          // Si la imagen ya cargó correctamente en el navegador
           if (img && img.complete && img.naturalWidth > 0) {
             ctx.save();
-            
-            // Calculamos el centro real de la sierra basándonos en si tiene ancho definido (Nivel 2) o radio (Nivel 4)
-            const centroX = sierra.width ? (sierra.x + sierra.width / 2) : sierra.x;
-            const centroY = sierra.height ? (sierra.y + sierra.height / 2) : sierra.y;
-            const anchoDibujo = sierra.width ? sierra.width : (sierra.radio * 2);
-            const altoDibujo = sierra.height ? sierra.height : (sierra.radio * 2);
-
-            ctx.translate(centroX, centroY);
+            // Centramos y rotamos de forma limpia usando las dimensiones de caja
+            ctx.translate(sierra.x + sierra.width / 2, sierra.y + sierra.height / 2);
             ctx.rotate(sierra.angulo);
-            
             ctx.drawImage(
               img,
               RECORTE_SIERRA.sx, RECORTE_SIERRA.sy, RECORTE_SIERRA.sw, RECORTE_SIERRA.sh,
-              -anchoDibujo / 2, -altoDibujo / 2, anchoDibujo, altoDibujo
+              -sierra.width / 2, -sierra.height / 2, sierra.width, sierra.height
             );
-            
             ctx.restore();
           } else {
-            // Respaldo visual si el servidor de Vercel tarda un milisegundo en responder
+            // Respaldo geométrico nítido por si acaso
             ctx.save();
-            const centroX = sierra.width ? (sierra.x + sierra.width / 2) : sierra.x;
-            const centroY = sierra.height ? (sierra.y + sierra.height / 2) : sierra.y;
-            const radioHitbox = sierra.hitbox ? sierra.hitbox : sierra.radio;
-
-            ctx.translate(centroX, centroY);
+            ctx.translate(sierra.x + sierra.width / 2, sierra.y + sierra.height / 2);
             ctx.rotate(sierra.angulo);
             ctx.fillStyle = '#718096';
             ctx.beginPath();
-            ctx.arc(0, 0, radioHitbox, 0, Math.PI * 2);
+            ctx.arc(0, 0, sierra.hitbox, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
           }
         }
       }
+
       // RENDERIZADO DEL JUGADOR
       ctx.save();
       if (state.inmune && Math.floor(Date.now() / 100) % 2 === 0) {
@@ -839,7 +824,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       ctx.fillStyle = '#63b3ed';
       ctx.font = 'bold 16px "Courier New", monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(`ESCENARIO ACTUAL: ${state.nivelActual}/4`, 80, 35); // Ajustado a /4
+      ctx.fillText(`ESCENARIO ACTUAL: ${state.nivelActual}/4`, 80, 35); 
       
       ctx.fillStyle = '#fff';
       ctx.fillText("VIDAS: ", 80, 55);
