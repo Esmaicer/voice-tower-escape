@@ -230,7 +230,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
     let loopId;
     let timeoutTransicionNivelId = null;
 
-    // 🛠️ EXTENSIÓN CORREGIDA A .png PARA EVITAR EL ERROR 404 EN VERCEL
     const fondosNiveles = {
       1: '/imagenes/fondo-torre.png',
       2: '/imagenes/fondo-torre2.png',
@@ -300,26 +299,27 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       return enemigos;
     };
 
+    // FUNCIÓN CORREGIDA SIN BUCLES INFINITOS NI VARIABLES NULAS
     const generarCorazonesDelNivel = (plataformas) => {
       const candidatas = plataformas.filter((plat, idx) => !plat.esPortal && idx !== 0);
       if (candidatas.length === 0) return [];
 
       const ordenadas = [...candidatas].sort((a, b) => b.y - a.y);
-      const tercio = Math.max(1, Math.ceil(ordenadas.length / 3));
+      const mTercio = Math.max(1, Math.ceil(ordenadas.length / 3));
 
-      const grupoInferior = ordenadas.slice(0, tercio);
-      const grupoMedio = ordenadas.slice(tercio, tercio * 2);
-      const grupoSuperior = ordenadas.slice(tercio * 2);
+      const grupoInferior = ordenadas.slice(0, mTercio);
+      const grupoMedio = ordenadas.slice(mTercio, mTercio * 2);
+      const grupoSuperior = ordenadas.slice(mTercio * 2);
 
       const elegirDeGrupo = (grupo) => {
         if (grupo.length === 0) return null;
-        const angostas = group => group.filter((plat) => plat.width <= 90);
-        const pool = angostas(grupo).length > 0 ? angostas(grupo) : grupo;
+        const angostas = grupo.filter((plat) => plat.width <= 90);
+        const pool = angostas.length > 0 ? angostas : grupo;
         return pool[Math.floor(Math.random() * pool.length)];
       };
 
-      const seleccionadas = [grupoInferior, grupoMedio, group => elegirDeGrupo(groupSuperior)]
-        .map((g, idx) => idx === 2 ? g(grupoSuperior) : elegirDeGrupo(g))
+      const seleccionadas = [grupoInferior, grupoMedio, grupoSuperior]
+        .map(elegirDeGrupo)
         .filter(Boolean);
 
       return seleccionadas.map((plat) => ({
@@ -329,7 +329,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       }));
     };
 
-    // Sierras homogeneizadas con formato de Caja/Hitbox para evitar fallos
     const generarSierrasDelNivel = () => {
       const sierras = [];
       const TAMANO_SIERRA = 105; 
@@ -392,8 +391,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       state.personaje.vx = 0;
       state.personaje.vy = 0;
       state.puntoMasAltoAlcanzadoY = 400;
-      
-      // Forzar recarga inmediata de la textura de fondo
       imagenFondo.src = fondosNiveles[state.nivelActual];
     };
 
@@ -464,7 +461,7 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
       }
 
       // ==========================================
-      // B. COLISIONES JUGADOR
+      // B. COLISIONES
       // ==========================================
       p.enSuelo = false;
 
@@ -617,10 +614,10 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         p.y = limiteInferior;
         state.camaraY -= desfase; 
         state.puntoMasAltoAlcanzadoY -= desfase; 
-        for (let plat of state.plataformas) { plat.y -= desfase; }
-        for (let ene of state.enemigos) { ene.y -= desfase; }
-        for (let cor of state.corazones) { cor.y -= desfase; }
-        for (let sierra of state.sierras) { sierra.y -= desfase; }
+        for (let plat of state.plataformas) plat.y -= desfase;
+        for (let ene of state.enemigos) ene.y -= desfase;
+        for (let cor of state.corazones) cor.y -= desfase;
+        for (let sierra of state.sierras) sierra.y -= desfase;
       }
 
       if (state.nivelActual === 3 || state.nivelActual === 4) {
@@ -741,7 +738,6 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         }
       }
 
-      // SECCIÓN COMPLETAMENTE CORREGIDA PARA LAS SIERRAS EN AMBOS NIVELES (2 Y 4)
       if (state.nivelActual === 2 || state.nivelActual === 4) {
         const img = imgSierraRef.current;
         const RECORTE_SIERRA = { sx: 357, sy: 82, sw: 820, sh: 820 }; 
