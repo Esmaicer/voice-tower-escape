@@ -699,41 +699,66 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
         ctx.restore();
       }
 
-      if (state.nivelActual === 3 || state.nivelActual === 4) {
-        for (let ene of state.enemigos) {
-          if (ene.y < -40 || ene.y > canvas.height + 40) continue;
+      if (state.nivelActual === 2 || state.nivelActual === 4) {
+        for (let sierra of state.sierras) {
+          if (sierra.y < -120 || sierra.y > canvas.height + 120) continue;
 
-          let imgEne = imgSlimeMoverRef.current;
-          let totalCuadrosEne = 4;
+          ctx.save();
+          // Trasladamos el punto de origen al centro exacto de la sierra
+          ctx.translate(sierra.x + sierra.width / 2, sierra.y + sierra.height / 2);
+          ctx.rotate(sierra.angulo);
 
-          if (ene.estado === 'alerta') {
-            imgEne = imgSlimeDanoRef.current;
-            totalCuadrosEne = 2;
-          } else if (ene.estado === 'muerto') {
-            imgEne = imgSlimeMuerteRef.current;
-            totalCuadrosEne = 4;
-          }
+          const radioExterior = sierra.width / 2;
+          const radioInterior = radioExterior * 0.75;
+          const numDientes = 12;
 
-          if (imgEne && imgEne.complete && imgEne.naturalWidth > 0) {
-            const anchoFrame = imgEne.naturalWidth / totalCuadrosEne;
-            const altoFrame = imgEne.naturalHeight;
-            const frameActual = ene.cuadroAnim % totalCuadrosEne;
+          // 1. DIBUJAR LOS DIENTES AFILADOS DE LA SIERRA (PIXEL-ART VECTORIAL)
+          ctx.fillStyle = '#cbd5e0'; // Color metálico claro para el filo
+          ctx.beginPath();
+          
+          for (let i = 0; i < numDientes; i++) {
+            const anguloBase = (i * 2 * Math.PI) / numDientes;
+            const anguloPunta = anguloBase + (Math.PI / numDientes) * 0.5;
 
-            ctx.save();
-            if (ene.vx > 0) {
-              ctx.translate(ene.x + ene.sizeX, ene.y);
-              ctx.scale(-1, 1);
-              ctx.drawImage(imgEne, frameActual * anchoFrame, 0, anchoFrame, altoFrame, 0, 0, ene.sizeX, ene.sizeY);
+            // Coordenada del inicio del diente (en el cuerpo interno)
+            const xInicio = Math.cos(anguloBase) * radioInterior;
+            const yInicio = Math.sin(anguloBase) * radioInterior;
+
+            // Coordenada de la punta afilada (en el borde exterior)
+            const xPunta = Math.cos(anguloPunta) * radioExterior;
+            const yPunta = Math.sin(anguloPunta) * radioExterior;
+
+            if (i === 0) {
+              ctx.moveTo(xInicio, yInicio);
             } else {
-              ctx.drawImage(imgEne, frameActual * anchoFrame, 0, anchoFrame, altoFrame, ene.x, ene.y, ene.sizeX, ene.sizeY);
+              ctx.lineTo(xInicio, yInicio);
             }
-            ctx.restore();
-          } else {
-            ctx.fillStyle = '#22c55e';
-            ctx.beginPath();
-            ctx.arc(ene.x + ene.sizeX / 2, ene.y + ene.sizeY / 2, ene.sizeY / 2, 0, Math.PI * 2);
-            ctx.fill();
+            
+            ctx.lineTo(xPunta, yPunta);
           }
+          
+          ctx.closePath();
+          ctx.fill();
+
+          // 2. CUERPO INTERNO DE LA CUCHILLA (Sombra metálica oscura)
+          ctx.fillStyle = '#4a5568'; 
+          ctx.beginPath();
+          ctx.arc(0, 0, radioInterior, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 3. DETALLE DE EMBELLECEDOR CENTRAL (Disco de acero brillante)
+          ctx.fillStyle = '#718096';
+          ctx.beginPath();
+          ctx.arc(0, 0, radioInterior * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 4. EJE CENTRAL DE ROTACIÓN (Hueco oscuro del engranaje)
+          ctx.fillStyle = '#1a202c';
+          ctx.beginPath();
+          ctx.arc(0, 0, 8, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
         }
       }
 
