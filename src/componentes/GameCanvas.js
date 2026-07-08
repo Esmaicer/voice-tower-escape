@@ -89,6 +89,15 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
 
     imgSierraRef.current = new Image();
     imgSierraRef.current.src = '/imagenes/Sierra.png';
+    
+    imgSlimeMoverRef.current = new Image();
+    imgSlimeMoverRef.current.src = '/imagenes/slime_mover.png';
+
+    imgSlimeDanoRef.current = new Image();
+    imgSlimeDanoRef.current.src = '/imagenes/slime_dano.png';
+
+    imgSlimeMuerteRef.current = new Image();
+    imgSlimeMuerteRef.current.src = '/imagenes/slime_muerte.png';
 
     musicaPistasRef.current = {
       1: new Audio('/sonido/musica-nivel1.mp3'),
