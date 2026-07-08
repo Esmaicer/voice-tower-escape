@@ -80,13 +80,13 @@ const GameCanvas = forwardRef(({ onGameOver, isPaused, initialMuted = false }, r
 
     // 🛠️ RUTAS DE SLIMES CORREGIDAS (SOLO LAS NUEVAS ASIGNACIONES LIMPIAS)
     imgSlimeMoverRef.current = new Image();
-    imgSlimeMoverRef.current.src = '/imagenes/slime_mover.png';
+    imgSlimeMoverRef.current.src = '/imagenes/Primer movimiento.png';
 
     imgSlimeDanoRef.current = new Image();
-    imgSlimeDanoRef.current.src = '/imagenes/slime_dano.png';
+    imgSlimeDanoRef.current.src = '/imagenes/Daño.png';
 
     imgSlimeMuerteRef.current = new Image();
-    imgSlimeMuerteRef.current.src = '/imagenes/slime_muerte.png';
+    imgSlimeMuerteRef.current.src = '/imagenes/Muerte.png';
 
     imgSierraRef.current = new Image();
     imgSierraRef.current.src = '/imagenes/Sierra.png';
